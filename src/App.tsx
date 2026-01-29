@@ -50,7 +50,7 @@ export function App() {
         gopherSocket.connect(authToken);
 
         return () => {
-            gopherSocket.disconnect();
+            // gopherSocket.disconnect();
         };
     }, [authToken]);
 

@@ -34,8 +34,8 @@ export function Setting({ onNavigate }: SettingProps) {
 
     // TODO: watch response
     const sendUserNameEdit = async (name: string) => {
-        setDeviceName(name);
         gopherSocket.send(WSTypes.CONFIG_NAME, name);
+        gopherSocket.send(WSTypes.USER_INFO, null);
     };
 
     React.useEffect(() => {
@@ -51,8 +51,7 @@ export function Setting({ onNavigate }: SettingProps) {
             gopherSocket.send(WSTypes.USER_INFO, null);
         })();
 
-        return () => {
-        };
+        return () => {};
     }, []);
 
     const handleSaveJson = () => {
@@ -154,7 +153,8 @@ export function Setting({ onNavigate }: SettingProps) {
                                 <Input
                                     id="device-name"
                                     value={deviceName}
-                                    onChange={(e) => sendUserNameEdit(e.target.value)}
+                                    onBlur={(e) => sendUserNameEdit(e.target.value)}
+                                    onChange={(e) => setDeviceName(e.target.value)}
                                 />
                             </div>
                             <div className="flex items-center justify-between rounded-lg border p-4">

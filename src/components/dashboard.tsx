@@ -4,16 +4,18 @@ import {
     UserPlusIcon,
     SendIcon,
     RadioIcon,
-    CloudIcon,
+    FileIcon,
+    Files,
+    Smile,
     MenuIcon,
 } from "lucide-react";
 import { gopherSocket, WSTypes } from "@/lib/ws";
-
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Sidebar } from "@/components/sidebar";
 import { User, WeirdUserWrapper } from "@/lib/def";
+import { Input } from "@/components/ui/input";
 import { getPublicKey } from "@/lib/helper";
 
 interface DashboardProps {
@@ -23,11 +25,44 @@ interface DashboardProps {
 export function Dashboard({ onNavigate }: DashboardProps) {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
     const [AllDevices, setAllDevices] = React.useState<User[]>([]);
+    const [selectedDevices, setSelectedDevices] = React.useState<string[]>([]);
+    const [targetFile, setTargetFile] = React.useState<File[]>([]);
+
+    const startTransaction = () => {
+        gopherSocket.send(WSTypes.NEW_TRANSACTION, null);
+    };
+    const fileInputRef = React.useRef<HTMLInputElement>(null); // i use shadcn and i have <Input> plaese use that with the file variant
+    const openFilePicker = () => {
+        fileInputRef.current?.click();
+    };
+    const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files ?? []);
+        setTargetFile(files);
+    };
+
+    const decideIcon = () => {
+        if (targetFile.length <= 0) return <Smile className="h-6 w-6 text-white"/>;
+        else if (targetFile.length == 1) return <FileIcon className="h-6 w-6 text-white"/>;
+        else return <Files className="h-6 w-6 text-white"/>;
+    }
+
+    const registerMember = (public_key: string) => {
+        setSelectedDevices(prev => {
+            if (prev.includes(public_key)) {
+                return prev.filter(k => k !== public_key);
+            }
+            return [...prev, public_key];
+        });
+    };
 
     React.useEffect(() => {
         let interval: number;
         const myPublicKey = getPublicKey();
         const handler = (devices: WeirdUserWrapper[]) => {
+            if (devices.length <= 0) {
+                setAllDevices([]);
+                return;
+            }
             const output: User[] = devices.map(d => d.user)
                 .filter(u => u.public_key !== myPublicKey);
             setAllDevices(output);
@@ -72,16 +107,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                         </Button>
                         <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
                     </div>
-
-                    {/*
-          <Button
-            variant="outline"
-            className="rounded-full gap-2 border-slate-200 text-slate-600 bg-white hover:bg-slate-50"
-          >
-            <WifiIcon className="h-4 w-4 text-cyan-500" />
-            15.9 MB/s
-          </Button>
-          */}
                 </header>
 
                 {/* Content */}
@@ -107,7 +132,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                                 <UserPlusIcon className="h-4 w-4" />
                                 Save as Group
                             </Button>
-                            <Button className="bg-cyan-400 hover:bg-cyan-500 text-white gap-2 shadow-sm shadow-cyan-200">
+                            <Button className="bg-cyan-400 hover:bg-cyan-500 text-white gap-2 shadow-sm shadow-cyan-200"
+                                onClick={() => { startTransaction() }}
+                            >
                                 <SendIcon className="h-4 w-4" />
                                 Send Now
                             </Button>
@@ -116,21 +143,31 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
                     {AllDevices.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {AllDevices.map((user) => (
-                                <Card key={user.public_key} className="p-4">
-                                    <div className="flex items-center gap-4">
-                                        <div className="h-10 w-10 rounded-full bg-cyan-100 flex items-center justify-center">
-                                            <MonitorSmartphone className="h-5 w-5 text-cyan-600" />
-                                        </div>
+                            {AllDevices.map((user) => {
+                                const selected = selectedDevices.includes(user.public_key);
+                                return (
+                                    <Card key={user.public_key} onClick={() => registerMember(user.public_key)}
+                                        className={`
+                                    p-4 cursor-pointer transition
+                                    ${selected
+                                                ? "border-cyan-400 ring-2 ring-cyan-300 bg-cyan-50"
+                                                : "hover:bg-slate-50"}
+                                        `}
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <div className="h-10 w-10 rounded-full bg-cyan-100 flex items-center justify-center">
+                                                <MonitorSmartphone className="h-5 w-5 text-cyan-600" />
+                                            </div>
 
-                                        <div className="flex-1">
-                                            <p className="font-semibold text-slate-900 text-md">
-                                                {user.username ?? "Unknown Device"}
-                                            </p>
+                                            <div className="flex-1">
+                                                <p className="font-semibold text-slate-900 text-md">
+                                                    {user.username ?? "Unknown Device"}
+                                                </p>
+                                            </div>
                                         </div>
-                                    </div>
-                                </Card>
-                            ))}
+                                    </Card>
+                                )
+                            })}
                         </div>
                     ) : (
                         <div className="flex-1 flex flex-col items-center justify-center min-h-[400px]">
@@ -151,18 +188,29 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 </div>
 
                 {/* Bottom Notification */}
-                <Card className="absolute bottom-4 left-4 right-4 md:bottom-8 md:left-8 md:right-8 shadow-lg border-0 pl-3 pr-3">
-                    <CardContent className="flex items-center p-4">
+                <Input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    onChange={onFileChange}
+                />
+                <Card className="absolute bottom-4 left-4 right-4 md:bottom-8 md:left-8 md:right-8 shadow-lg border-0 pl-3 pr-3 animate-in slide-in-from-bottom-4 fade-in">
+                    <CardContent className="flex items-center">
                         <div className="h-12 w-12 rounded-full bg-cyan-400 flex items-center justify-center mr-4 shrink-0">
-                            <CloudIcon className="h-6 w-6 text-white" />
+                        { decideIcon() }
                         </div>
+
                         <div className="flex-1">
-                            <h4 className="font-bold text-slate-900">1 File(s) Restored</h4>
-                            <p className="text-slate-500 text-sm">
-                                Files restored from previous session.
-                            </p>
+                            <h4 className="font-bold text-slate-900">
+                                <span className="text-lg text-cyan-600 mr-1">{targetFile.length}</span> File{targetFile.length !== 1 && "s"} Selected
+                            </h4>
                         </div>
-                        <Button className="bg-slate-900 text-white hover:bg-slate-800 shrink-0">
+
+                        <Button
+                            className="bg-cyan-400 text-white hover:bg-slate-800 shrink-0"
+                            onClick={openFilePicker}
+                        >
                             Select Files
                         </Button>
                     </CardContent>
