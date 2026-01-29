@@ -103,7 +103,7 @@ export function Setting({ onNavigate }: SettingProps) {
             />
 
             <main className="flex-1 flex flex-col relative">
-                <header className="h-16 md:h-24 bg-white border-b border-slate-100 flex items-center justify-between px-4 md:px-8">
+                <header className="h-16 md:h-24 border-b border-slate-100 flex items-center justify-between px-4 md:px-8">
                     <div className="flex items-center gap-4">
                         <Button
                             variant="ghost"
@@ -135,29 +135,30 @@ export function Setting({ onNavigate }: SettingProps) {
                                 <line x1="4" x2="20" y1="18" y2="18" />
                             </svg>
                         </Button>
-                        <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
+                        <h1 className="text-2xl font-bold text-primary/100">Settings</h1>
                     </div>
                 </header>
 
                 <div className="flex-1 p-4 md:p-8 max-w-2xl mx-auto w-full">
                     <Card className="mb-6">
                         <CardHeader>
-                            <CardTitle>Device Settings</CardTitle>
+                            <CardTitle className="text-primary/100 font-bold">Device Settings</CardTitle>
                             <CardDescription>
                                 Manage your device visibility and identity.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
                             <div className="space-y-2">
-                                <Label htmlFor="device-name">Device Name</Label>
+                                <Label htmlFor="device-name" className="pb-1">Device Name</Label>
                                 <Input
                                     id="device-name"
+                                    className="p-5"
                                     value={deviceName}
                                     onBlur={(e) => sendUserNameEdit(e.target.value)}
                                     onChange={(e) => setDeviceName(e.target.value)}
                                 />
                             </div>
-                            <div className="flex items-center justify-between rounded-lg border p-4">
+                            <div className="flex items-center justify-between border p-4">
                                 <div className="space-y-0.5 pr-2">
                                     <Label className="text-base">Discoverable</Label>
                                     <p className="text-sm text-slate-500">

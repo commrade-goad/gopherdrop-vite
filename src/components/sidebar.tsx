@@ -35,7 +35,7 @@ export function Sidebar({
       className={cn(
         "w-full justify-start gap-3",
         activePage === page
-          ? "bg-cyan-50 text-cyan-600 hover:bg-cyan-100 hover:text-cyan-700"
+          ? "bg-accent/100 text-primary/100"
           : "text-slate-500 hover:text-slate-900",
       )}
       onClick={() => {
@@ -51,10 +51,10 @@ export function Sidebar({
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-64 bg-white border-r border-slate-200 flex-col shrink-0">
+      <aside className="hidden md:flex w-64 bg-background/100 border-r border-slate-200 flex-col shrink-0">
         <div className="p-6 flex items-center gap-3">
-          <div className="bg-cyan-400 p-2 rounded-lg">
-            <RocketIcon className="h-6 w-6 text-white" />
+          <div className="bg-primary/100 p-2 rounded-lg">
+            <RocketIcon className="h-6 w-6 text-background/100" />
           </div>
           <span className="font-bold text-xl tracking-tight">GopherDrop</span>
         </div>
@@ -68,11 +68,11 @@ export function Sidebar({
 
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-50 bg-white md:hidden flex flex-col">
+        <div className="fixed inset-0 z-50 bg-background/100 md:hidden flex flex-col">
           <div className="p-6 flex items-center justify-between border-b border-slate-100">
             <div className="flex items-center gap-3">
               <div className="bg-cyan-400 p-2 rounded-lg">
-                <RocketIcon className="h-6 w-6 text-white" />
+                <RocketIcon className="h-6 w-6 text-background/100" />
               </div>
               <span className="font-bold text-xl tracking-tight">
                 GopherDrop

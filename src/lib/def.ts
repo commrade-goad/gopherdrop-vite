@@ -6,3 +6,15 @@ export class User {
 export interface WeirdUserWrapper {
     user: User;
 };
+
+export interface GFile {
+	name: string,
+	size: number,
+	type: string,
+}
+
+export interface Transaction {
+    id: string,
+    files: GFile[],
+    started: boolean,
+}

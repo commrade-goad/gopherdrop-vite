@@ -9,12 +9,22 @@ import {
     Smile,
     MenuIcon,
 } from "lucide-react";
+import {
+    AlertDialog,
+    AlertDialogContent,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogCancel,
+    AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 import { gopherSocket, WSTypes } from "@/lib/ws";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Sidebar } from "@/components/sidebar";
-import { User, WeirdUserWrapper } from "@/lib/def";
+import { User, WeirdUserWrapper, Transaction } from "@/lib/def";
 import { Input } from "@/components/ui/input";
 import { getPublicKey } from "@/lib/helper";
 
@@ -27,9 +37,20 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     const [AllDevices, setAllDevices] = React.useState<User[]>([]);
     const [selectedDevices, setSelectedDevices] = React.useState<string[]>([]);
     const [targetFile, setTargetFile] = React.useState<File[]>([]);
+    const [ActiveTransaction, setActiveTransaction] = React.useState<Transaction>();
+    const [errorDialog, setErrorDialog] = React.useState(false);
 
     const startTransaction = () => {
+        if (targetFile.length <= 0 || selectedDevices.length <= 0) {
+            setErrorDialog(true);
+            return;
+        }
+        if (ActiveTransaction && ActiveTransaction.id.length > 0) {
+            setErrorDialog(true);
+            return;
+        }
         gopherSocket.send(WSTypes.NEW_TRANSACTION, null);
+        // setConfirmSend(true);
     };
     const fileInputRef = React.useRef<HTMLInputElement>(null); // i use shadcn and i have <Input> plaese use that with the file variant
     const openFilePicker = () => {
@@ -41,9 +62,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     };
 
     const decideIcon = () => {
-        if (targetFile.length <= 0) return <Smile className="h-6 w-6 text-white"/>;
-        else if (targetFile.length == 1) return <FileIcon className="h-6 w-6 text-white"/>;
-        else return <Files className="h-6 w-6 text-white"/>;
+        if (targetFile.length <= 0) return <Smile className="h-6 w-6 text-background/100" />;
+        else if (targetFile.length == 1) return <FileIcon className="h-6 w-6 text-background/100" />;
+        else return <Files className="h-6 w-6 text-background/100" />;
     }
 
     const registerMember = (public_key: string) => {
@@ -95,7 +116,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             {/* Main Content */}
             <main className="flex-1 flex flex-col relative">
                 {/* Header */}
-                <header className="h-16 md:h-24 bg-white border-b border-slate-100 flex items-center justify-between px-4 md:px-8">
+                <header className="h-16 md:h-24 border-b border-slate-100 flex items-center justify-between px-4 md:px-8">
                     <div className="flex items-center gap-4">
                         <Button
                             variant="ghost"
@@ -105,7 +126,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                         >
                             <MenuIcon className="h-6 w-6" />
                         </Button>
-                        <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
+                        <h1 className="text-2xl font-bold text-primary/100">Dashboard</h1>
                     </div>
                 </header>
 
@@ -118,7 +139,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                             </span>
                             <Badge
                                 variant="secondary"
-                                className="bg-cyan-100/50 text-cyan-600 hover:bg-cyan-100 border-0 text-[10px] px-2 py-0.5 rounded-sm"
+                                className="bg-foreground/10 text-primary/100 border-0 text-[10px] px-2 py-0.5"
                             >
                                 {AllDevices.length} FOUND
                             </Badge>
@@ -132,7 +153,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                                 <UserPlusIcon className="h-4 w-4" />
                                 Save as Group
                             </Button>
-                            <Button className="bg-cyan-400 hover:bg-cyan-500 text-white gap-2 shadow-sm shadow-cyan-200"
+                            <Button className="gap-2 shadow-sm"
                                 onClick={() => { startTransaction() }}
                             >
                                 <SendIcon className="h-4 w-4" />
@@ -150,17 +171,17 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                                         className={`
                                     p-4 cursor-pointer transition
                                     ${selected
-                                                ? "border-cyan-400 ring-2 ring-cyan-300 bg-cyan-50"
-                                                : "hover:bg-slate-50"}
+                                                ? "ring-2 ring-primary/50 bg-primary/5 text-primary/75"
+                                                : "hover:bg-slate-50 text-foreground/75"}
                                         `}
                                     >
                                         <div className="flex items-center gap-4">
-                                            <div className="h-10 w-10 rounded-full bg-cyan-100 flex items-center justify-center">
-                                                <MonitorSmartphone className="h-5 w-5 text-cyan-600" />
+                                            <div className="rounded-full h-10 w-10 bg-primary/100 flex items-center justify-center">
+                                                <MonitorSmartphone className="h-5 w-5 text-background/100" />
                                             </div>
 
                                             <div className="flex-1">
-                                                <p className="font-semibold text-slate-900 text-md">
+                                                <p className="font-semibold text-md">
                                                     {user.username ?? "Unknown Device"}
                                                 </p>
                                             </div>
@@ -172,12 +193,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                     ) : (
                         <div className="flex-1 flex flex-col items-center justify-center min-h-[400px]">
                             <div className="relative mb-6">
-                                <div className="absolute inset-0 bg-slate-200/30 rounded-full animate-ping" />
-                                <div className="h-16 w-16 bg-white rounded-full flex items-center justify-center shadow-sm relative z-10">
+                                <div className="absolute rounded-full inset-0 bg-slate-200/30 animate-ping" />
+                                <div className="h-16 w-16 rounded-full bg-background/100 flex items-center justify-center shadow-sm relative z-10">
                                     <RadioIcon className="h-8 w-8 text-slate-300" />
                                 </div>
                             </div>
-                            <h3 className="font-bold text-slate-900 text-lg mb-1">
+                            <h3 className="font-bold text-primary/100 text-lg mb-1">
                                 Scanning for devices...
                             </h3>
                             <p className="text-slate-500 text-sm">
@@ -197,24 +218,42 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 />
                 <Card className="absolute bottom-4 left-4 right-4 md:bottom-8 md:left-8 md:right-8 shadow-lg border-0 pl-3 pr-3 animate-in slide-in-from-bottom-4 fade-in">
                     <CardContent className="flex items-center">
-                        <div className="h-12 w-12 rounded-full bg-cyan-400 flex items-center justify-center mr-4 shrink-0">
-                        { decideIcon() }
+                        <div className="h-12 w-12 rounded-full bg-primary/100 flex items-center justify-center mr-4 shrink-0">
+                            {decideIcon()}
                         </div>
 
                         <div className="flex-1">
-                            <h4 className="font-bold text-slate-900">
-                                <span className="text-lg text-cyan-600 mr-1">{targetFile.length}</span> File{targetFile.length !== 1 && "s"} Selected
+                            <h4 className="font-bold text-foreground/100">
+                                <span className="text-lg text-primary/100 mr-1">{targetFile.length}</span> File{targetFile.length !== 1 && "s"} Selected
                             </h4>
                         </div>
 
                         <Button
-                            className="bg-cyan-400 text-white hover:bg-slate-800 shrink-0"
+                            className="shrink-0 p-5"
                             onClick={openFilePicker}
                         >
                             Select Files
                         </Button>
                     </CardContent>
                 </Card>
+                <AlertDialog open={errorDialog} onOpenChange={setErrorDialog}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle className="font-bold text-primary/100 pb-3">Failed to start transaction</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                {targetFile.length <= 0 && "Please select at least one file.\n"}
+                                {selectedDevices.length <= 0 && "Please select at least one device.\n"}
+                                {(ActiveTransaction && ActiveTransaction.id.length > 0) && "Already in active transaction."}
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+
+                        <AlertDialogFooter>
+                            <AlertDialogAction onClick={() => {setErrorDialog(false)}}
+                            className="p-5"
+                            >OK</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </main>
         </div>
     );
