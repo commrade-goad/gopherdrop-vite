@@ -15,6 +15,7 @@ export interface GFile {
 
 export interface Transaction {
     id: string,
+    sender: WeirdUserWrapper,
     files: GFile[],
     started: boolean,
 }

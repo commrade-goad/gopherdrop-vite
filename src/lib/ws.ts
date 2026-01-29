@@ -123,6 +123,16 @@ export class GopherSocket {
     }
 
     /**
+     * Unregister message handler
+     */
+    off<T>(type: WSType, callback: Handler<T>): void {
+        const handlers = this.handlers[type];
+        if (!handlers) return;
+
+        this.handlers[type] = handlers.filter(h => h !== callback);
+    }
+
+    /**
      * Optional helpers
      */
     disconnect(): void {

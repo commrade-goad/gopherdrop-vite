@@ -1,22 +1,22 @@
 import * as React from "react";
 import {
-    MonitorSmartphone,
-    UserPlusIcon,
-    SendIcon,
-    RadioIcon,
-    FileIcon,
-    Files,
-    Smile,
-    MenuIcon,
+  MonitorSmartphone,
+  UserPlusIcon,
+  SendIcon,
+  RadioIcon,
+  FileIcon,
+  Files,
+  Smile,
+  MenuIcon,
 } from "lucide-react";
 import {
-    AlertDialog,
-    AlertDialogContent,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogAction,
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import { gopherSocket, WSTypes } from "@/lib/ws";
 import { Button } from "@/components/ui/button";
@@ -28,240 +28,264 @@ import { Input } from "@/components/ui/input";
 import { getPublicKey } from "@/lib/helper";
 
 interface DashboardProps {
-    onNavigate: (page: string) => void;
+  onNavigate: (page: string) => void;
 }
 
 // TODO: save the state (file and target)
 export function Dashboard({ onNavigate }: DashboardProps) {
-    const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
-    const [AllDevices, setAllDevices] = React.useState<User[]>([]);
-    const [selectedDevices, setSelectedDevices] = React.useState<string[]>([]);
-    const [targetFile, setTargetFile] = React.useState<File[]>([]);
-    const [ActiveTransaction, setActiveTransaction] = React.useState<Transaction>();
-    const [errorDialog, setErrorDialog] = React.useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+  const [AllDevices, setAllDevices] = React.useState<User[]>([]);
+  const [selectedDevices, setSelectedDevices] = React.useState<string[]>([]);
+  const [targetFile, setTargetFile] = React.useState<File[]>([]);
+  const [ActiveTransaction, setActiveTransaction] = React.useState<Transaction>();
+  const [errorDialog, setErrorDialog] = React.useState(false);
 
-    const newTransactionHandler = (data: Transaction) => {
-        console.log(data);
-        setActiveTransaction(data);
-    };
-    gopherSocket.on(WSTypes.NEW_TRANSACTION, newTransactionHandler);
-    const startTransaction = () => {
-        if (targetFile.length <= 0 || selectedDevices.length <= 0) {
-            setErrorDialog(true);
-            return;
-        }
-        if (ActiveTransaction && ActiveTransaction.id.length > 0) {
-            setErrorDialog(true);
-            return;
-        }
-        gopherSocket.send(WSTypes.NEW_TRANSACTION, null);
-        if (ActiveTransaction && selectedDevices) {
-            gopherSocket.send(WSTypes.USER_SHARE_TARGET, { transaction_id: ActiveTransaction.id, public_keys: selectedDevices });
-        }
-    };
-    const fileInputRef = React.useRef<HTMLInputElement>(null);
-    const openFilePicker = () => {
-        fileInputRef.current?.click();
-    };
-    const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(e.target.files ?? []);
-        setTargetFile(files);
-    };
-
-    const decideIcon = () => {
-        if (targetFile.length <= 0) return <Smile className="h-6 w-6 text-background/100" />;
-        else if (targetFile.length == 1) return <FileIcon className="h-6 w-6 text-background/100" />;
-        else return <Files className="h-6 w-6 text-background/100" />;
+  const startTransaction = () => {
+    if (targetFile.length <= 0 || selectedDevices.length <= 0) {
+      setErrorDialog(true);
+      return;
     }
+    if (ActiveTransaction && ActiveTransaction.id.length > 0) {
+      setErrorDialog(true);
+      return;
+    }
+    gopherSocket.send(WSTypes.NEW_TRANSACTION, null);
+  };
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const openFilePicker = () => {
+    fileInputRef.current?.click();
+  };
+  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    setTargetFile(files);
+  };
 
-    const registerMember = (public_key: string) => {
-        setSelectedDevices(prev => {
-            if (prev.includes(public_key)) {
-                return prev.filter(k => k !== public_key);
-            }
-            return [...prev, public_key];
-        });
+  const decideIcon = () => {
+    if (targetFile.length <= 0) return <Smile className="h-6 w-6 text-background/100" />;
+    else if (targetFile.length == 1) return <FileIcon className="h-6 w-6 text-background/100" />;
+    else return <Files className="h-6 w-6 text-background/100" />;
+  }
+
+  const registerMember = (public_key: string) => {
+    setSelectedDevices(prev => {
+      if (prev.includes(public_key)) {
+        return prev.filter(k => k !== public_key);
+      }
+      return [...prev, public_key];
+    });
+  };
+
+  React.useEffect(() => {
+    let interval: number;
+    const myPublicKey = getPublicKey();
+
+    const deviceListHandler = (devices: WeirdUserWrapper[]) => {
+      const next = devices
+        .map(d => d.user)
+        .filter(u => u.public_key !== myPublicKey);
+
+      setAllDevices(prev => {
+        if (prev.length === next.length &&
+          prev.every((p, i) => p.public_key === next[i]?.public_key)
+        ) {
+          return prev;
+        }
+        return next;
+      });
     };
 
-    React.useEffect(() => {
-        let interval: number;
-        const myPublicKey = getPublicKey();
-        const handler = (devices: WeirdUserWrapper[]) => {
-            if (devices.length <= 0) {
-                setAllDevices([]);
-                return;
-            }
-            const output: User[] = devices.map(d => d.user)
-                .filter(u => u.public_key !== myPublicKey);
-            setAllDevices(output);
-        };
+    const TransactionShareAcceptHandler = (data: any) => {
+      console.log(data);
+    }
+    const newTransactionHandler = (data: Transaction) => {
+      console.log(data);
+      setActiveTransaction(data);
+    };
 
-        (async () => {
-            await gopherSocket.waitUntilConnected();
+    (async () => {
+      await gopherSocket.waitUntilConnected();
 
-            gopherSocket.on(WSTypes.USER_SHARE_LIST, handler);
-            gopherSocket.send(WSTypes.START_SHARING, null);
-            interval = window.setInterval(() => {
-                gopherSocket.send(WSTypes.START_SHARING, null);
-            }, 3000);
-        })();
+      gopherSocket.on(WSTypes.USER_SHARE_LIST, deviceListHandler);
+      gopherSocket.on(WSTypes.NEW_TRANSACTION, newTransactionHandler);
+      gopherSocket.on(WSTypes.TRANSACTION_SHARE_ACCEPT, TransactionShareAcceptHandler);
+      gopherSocket.send(WSTypes.START_SHARING, null);
 
-        return () => {
-            clearInterval(interval);
-        };
-    }, []);
+      interval = window.setInterval(() => {
+        gopherSocket.send(WSTypes.START_SHARING, null);
+      }, 5000);
+    })();
 
-    return (
-        <div className="flex min-h-screen bg-slate-50 text-slate-900">
-            <Sidebar
-                activePage="dashboard"
-                onNavigate={onNavigate}
-                isMobileMenuOpen={isMobileMenuOpen}
-                setIsMobileMenuOpen={setIsMobileMenuOpen}
-            />
+    return () => {
+      clearInterval(interval);
+      gopherSocket.off(WSTypes.USER_SHARE_LIST, deviceListHandler);
+      gopherSocket.off(WSTypes.NEW_TRANSACTION, newTransactionHandler);
+    };
+  }, []);
 
-            {/* Main Content */}
-            <main className="flex-1 flex flex-col relative">
-                {/* Header */}
-                <header className="h-16 md:h-24 border-b border-slate-100 flex items-center justify-between px-4 md:px-8">
-                    <div className="flex items-center gap-4">
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="md:hidden text-slate-500"
-                            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                        >
-                            <MenuIcon className="h-6 w-6" />
-                        </Button>
-                        <h1 className="text-2xl font-bold text-primary/100">Dashboard</h1>
-                    </div>
-                </header>
+  React.useEffect(() => {
+    const myPublicKey = getPublicKey();
+    if (ActiveTransaction == undefined) return;
+    if (selectedDevices.length === 0) return;
 
-                {/* Content */}
-                <div className="flex-1 p-4 md:p-8 bg-slate-50/50">
-                    <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4 md:gap-0">
-                        <div className="flex items-center gap-3">
-                            <span className="text-xs font-bold tracking-widest text-slate-400 uppercase">
-                                Online Devices
-                            </span>
-                            <Badge
-                                variant="secondary"
-                                className="bg-foreground/10 text-primary/100 border-0 text-[10px] px-2 py-0.5"
-                            >
-                                {AllDevices.length} FOUND
-                            </Badge>
-                        </div>
+    if (ActiveTransaction.sender.user.public_key !== myPublicKey) return;
 
-                        <div className="flex items-center gap-3">
-                            <Button
-                                variant="ghost"
-                                className="gap-2 text-slate-500 hover:text-slate-700"
-                            >
-                                <UserPlusIcon className="h-4 w-4" />
-                                Save as Group
-                            </Button>
-                            <Button className="gap-2 shadow-sm"
-                                onClick={() => { startTransaction() }}
-                            >
-                                <SendIcon className="h-4 w-4" />
-                                Send Now
-                            </Button>
-                        </div>
-                    </div>
+    gopherSocket.send(WSTypes.USER_SHARE_TARGET, {
+      transaction_id: ActiveTransaction.id,
+      public_keys: selectedDevices,
+    });
+  }, [ActiveTransaction]);
 
-                    {AllDevices.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {AllDevices.map((user) => {
-                                const selected = selectedDevices.includes(user.public_key);
-                                return (
-                                    <Card key={user.public_key} onClick={() => registerMember(user.public_key)}
-                                        className={`
-                                    p-4 cursor-pointer transition
+  return (
+    <div className="flex min-h-screen bg-slate-50 text-slate-900">
+      <Sidebar
+        activePage="dashboard"
+        onNavigate={onNavigate}
+        isMobileMenuOpen={isMobileMenuOpen}
+        setIsMobileMenuOpen={setIsMobileMenuOpen}
+      />
+
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col relative">
+        {/* Header */}
+        <header className="h-16 md:h-24 border-b border-slate-100 flex items-center justify-between px-4 md:px-8">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden text-slate-500"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            >
+              <MenuIcon className="h-6 w-6" />
+            </Button>
+            <h1 className="text-2xl font-bold text-primary/100">Dashboard</h1>
+          </div>
+        </header>
+
+        {/* Content */}
+        <div className="flex-1 p-4 md:p-8 bg-slate-50/50">
+          <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4 md:gap-0">
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-bold tracking-widest text-slate-400 uppercase">
+                                                                                             Online Devices
+              </span>
+              <Badge
+                variant="secondary"
+                className="bg-foreground/10 text-primary/100 border-0 text-[10px] px-2 py-0.5"
+              >
+                {AllDevices.length} FOUND
+              </Badge>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                className="gap-2 text-slate-500 hover:text-slate-700"
+              >
+                <UserPlusIcon className="h-4 w-4" />
+                                                      Save as Group
+              </Button>
+              <Button className="gap-2 shadow-sm"
+                onClick={() => { startTransaction() }}
+              >
+                <SendIcon className="h-4 w-4" />
+                                                  Send Now
+              </Button>
+            </div>
+          </div>
+
+          {AllDevices.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {AllDevices.map((user) => {
+                const selected = selectedDevices.includes(user.public_key);
+                return (
+                  <Card key={user.public_key} onClick={() => registerMember(user.public_key)}
+                    className={`
+                    p-4 cursor-pointer transition
                                     ${selected
-                                                ? "ring-2 ring-primary/50 bg-primary/5 text-primary/75"
-                                                : "hover:bg-slate-50 text-foreground/75"}
+                                      ? "ring-2 ring-primary/50 bg-primary/5 text-primary/75"
+                                      : "hover:bg-slate-50 text-foreground/75"}
                                         `}
-                                    >
-                                        <div className="flex items-center gap-4">
-                                            <div className="rounded-full h-10 w-10 bg-primary/100 flex items-center justify-center">
-                                                <MonitorSmartphone className="h-5 w-5 text-background/100" />
-                                            </div>
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="rounded-full h-10 w-10 bg-primary/100 flex items-center justify-center">
+                        <MonitorSmartphone className="h-5 w-5 text-background/100" />
+                      </div>
 
-                                            <div className="flex-1">
-                                                <p className="font-semibold text-md">
-                                                    {user.username ?? "Unknown Device"}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </Card>
-                                )
-                            })}
-                        </div>
-                    ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center min-h-[400px]">
-                            <div className="relative mb-6">
-                                <div className="absolute rounded-full inset-0 bg-slate-200/30 animate-ping" />
-                                <div className="h-16 w-16 rounded-full bg-background/100 flex items-center justify-center shadow-sm relative z-10">
-                                    <RadioIcon className="h-8 w-8 text-slate-300" />
-                                </div>
-                            </div>
-                            <h3 className="font-bold text-primary/100 text-lg mb-1">
-                                Scanning for devices...
-                            </h3>
-                            <p className="text-slate-500 text-sm">
-                                Ensure other devices enabled the discover settings.
-                            </p>
-                        </div>
-                    )}
+                      <div className="flex-1">
+                        <p className="font-semibold text-md">
+                          {user.username ?? "Unknown Device"}
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center min-h-[400px]">
+              <div className="relative mb-6">
+                <div className="absolute rounded-full inset-0 bg-slate-200/30 animate-ping" />
+                <div className="h-16 w-16 rounded-full bg-background/100 flex items-center justify-center shadow-sm relative z-10">
+                  <RadioIcon className="h-8 w-8 text-slate-300" />
                 </div>
-
-                {/* Bottom Notification */}
-                <Input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    className="hidden"
-                    onChange={onFileChange}
-                />
-                <Card className="absolute bottom-4 left-4 right-4 md:bottom-8 md:left-8 md:right-8 shadow-lg border-0 pl-3 pr-3 animate-in slide-in-from-bottom-4 fade-in">
-                    <CardContent className="flex items-center">
-                        <div className="h-12 w-12 rounded-full bg-primary/100 flex items-center justify-center mr-4 shrink-0">
-                            {decideIcon()}
-                        </div>
-
-                        <div className="flex-1">
-                            <h4 className="font-bold text-foreground/100">
-                                <span className="text-lg text-primary/100 mr-1">{targetFile.length}</span> File{targetFile.length !== 1 && "s"} Selected
-                            </h4>
-                        </div>
-
-                        <Button
-                            className="shrink-0 p-5"
-                            onClick={openFilePicker}
-                        >
-                            Select Files
-                        </Button>
-                    </CardContent>
-                </Card>
-                <AlertDialog open={errorDialog} onOpenChange={setErrorDialog}>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle className="font-bold text-primary/100 pb-3">Failed to start transaction</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                {targetFile.length <= 0 && "Please select at least one file.\n"}
-                                {selectedDevices.length <= 0 && "Please select at least one device.\n"}
-                                {(ActiveTransaction && ActiveTransaction.id.length > 0) && "Already in active transaction."}
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-
-                        <AlertDialogFooter>
-                            <AlertDialogAction onClick={() => { setErrorDialog(false) }}
-                                className="p-5"
-                            >OK</AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
-            </main>
+              </div>
+              <h3 className="font-bold text-primary/100 text-lg mb-1">
+                                                                        Scanning for devices...
+              </h3>
+              <p className="text-slate-500 text-sm">
+                                                      Ensure other devices enabled the discover settings.
+              </p>
+            </div>
+          )}
         </div>
-    );
+
+        {/* Bottom Notification */}
+        <Input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={onFileChange}
+        />
+        <Card className="absolute bottom-4 left-4 right-4 md:bottom-8 md:left-8 md:right-8 shadow-lg border-0 pl-3 pr-3 animate-in slide-in-from-bottom-4 fade-in">
+          <CardContent className="flex items-center">
+            <div className="h-12 w-12 rounded-full bg-primary/100 flex items-center justify-center mr-4 shrink-0">
+              {decideIcon()}
+            </div>
+
+            <div className="flex-1">
+              <h4 className="font-bold text-foreground/100">
+                <span className="text-lg text-primary/100 mr-1">{targetFile.length}</span> File{targetFile.length !== 1 && "s"} Selected
+              </h4>
+            </div>
+
+            <Button
+              className="shrink-0 p-5"
+              onClick={openFilePicker}
+            >
+               Select Files
+            </Button>
+          </CardContent>
+        </Card>
+        <AlertDialog open={errorDialog} onOpenChange={setErrorDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="font-bold text-primary/100 pb-3">Failed to start transaction</AlertDialogTitle>
+              <AlertDialogDescription>
+                {targetFile.length <= 0 && "Please select at least one file.\n"}
+                {selectedDevices.length <= 0 && "Please select at least one device.\n"}
+                {(ActiveTransaction && ActiveTransaction.id.length > 0) && "Already in active transaction."}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+
+            <AlertDialogFooter>
+              <AlertDialogAction onClick={() => { setErrorDialog(false) }}
+                className="p-5"
+              >OK</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </main>
+    </div>
+  );
 }

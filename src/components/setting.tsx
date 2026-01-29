@@ -51,7 +51,9 @@ export function Setting({ onNavigate }: SettingProps) {
             gopherSocket.send(WSTypes.USER_INFO, null);
         })();
 
-        return () => {};
+        return () => {
+            gopherSocket.off(WSTypes.USER_INFO, handler);
+        };
     }, []);
 
     const handleSaveJson = () => {
