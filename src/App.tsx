@@ -2,7 +2,7 @@ import * as React from "react";
 import { Dashboard } from "@/components/dashboard";
 import { Setting } from "@/components/setting";
 import { initAuth } from "@/lib/auth";
-import { gopherSocket, WSType } from "@/lib/ws";
+import { gopherSocket, WSTypes } from "@/lib/ws";
 
 export function App() {
   const [activePage, setActivePage] = React.useState(() => {
@@ -53,11 +53,10 @@ export function App() {
       // updateDeviceList(devices);
     };
 
-    gopherSocket.on(WSType.USER_SHARE_LIST, handleUserShareList);
+    gopherSocket.on(WSTypes.USER_SHARE_LIST, handleUserShareList);
 
     return () => {
       gopherSocket.disconnect();
-      // NOTE: if you add `.off()`, unregister handler here
     };
   }, [authToken]);
 
