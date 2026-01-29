@@ -19,3 +19,13 @@ export interface Transaction {
     files: GFile[],
     started: boolean,
 }
+
+export interface TxAccReq {
+  sender: string,
+  transaction: Transaction,
+};
+
+export interface TxRespReq {
+  transaction_id: string,
+  accept: boolean,
+};

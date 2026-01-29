@@ -23,33 +23,37 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Sidebar } from "@/components/sidebar";
-import { User, WeirdUserWrapper, Transaction } from "@/lib/def";
+import { User, WeirdUserWrapper, GFile } from "@/lib/def";
 import { Input } from "@/components/ui/input";
 import { getPublicKey } from "@/lib/helper";
+import { useTransaction } from "@/context/TransactionContext";
 
 interface DashboardProps {
   onNavigate: (page: string) => void;
 }
 
+// TODO: the error stuff
 // TODO: save the state (file and target)
 export function Dashboard({ onNavigate }: DashboardProps) {
+  const { activeTransaction, startTransaction: StartTx, clearRequest, requestedTransaction } = useTransaction();
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [AllDevices, setAllDevices] = React.useState<User[]>([]);
   const [selectedDevices, setSelectedDevices] = React.useState<string[]>([]);
-  const [targetFile, setTargetFile] = React.useState<File[]>([]);
-  const [ActiveTransaction, setActiveTransaction] = React.useState<Transaction>();
+  const [targetFile, setTargetFile] = React.useState<GFile[]>([]);
   const [errorDialog, setErrorDialog] = React.useState(false);
+  const [acceptanceDialog, setAcceptanceDialog] = React.useState(false);
 
   const startTransaction = () => {
     if (targetFile.length <= 0 || selectedDevices.length <= 0) {
       setErrorDialog(true);
       return;
     }
-    if (ActiveTransaction && ActiveTransaction.id.length > 0) {
+    if (activeTransaction && activeTransaction.id.length > 0) {
       setErrorDialog(true);
       return;
     }
-    gopherSocket.send(WSTypes.NEW_TRANSACTION, null);
+    if (StartTx) StartTx();
   };
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const openFilePicker = () => {
@@ -57,7 +61,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   };
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
-    setTargetFile(files);
+    const gfiles: GFile[] = files.map((v) => ({
+      name: v.name,
+      size: v.size,
+      type: v.type,
+    }));
+    setTargetFile(gfiles);
   };
 
   const decideIcon = () => {
@@ -94,20 +103,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       });
     };
 
-    const TransactionShareAcceptHandler = (data: any) => {
-      console.log(data);
-    }
-    const newTransactionHandler = (data: Transaction) => {
-      console.log(data);
-      setActiveTransaction(data);
-    };
-
     (async () => {
       await gopherSocket.waitUntilConnected();
 
       gopherSocket.on(WSTypes.USER_SHARE_LIST, deviceListHandler);
-      gopherSocket.on(WSTypes.NEW_TRANSACTION, newTransactionHandler);
-      gopherSocket.on(WSTypes.TRANSACTION_SHARE_ACCEPT, TransactionShareAcceptHandler);
       gopherSocket.send(WSTypes.START_SHARING, null);
 
       interval = window.setInterval(() => {
@@ -118,22 +117,32 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     return () => {
       clearInterval(interval);
       gopherSocket.off(WSTypes.USER_SHARE_LIST, deviceListHandler);
-      gopherSocket.off(WSTypes.NEW_TRANSACTION, newTransactionHandler);
     };
   }, []);
 
   React.useEffect(() => {
+    if (requestedTransaction) {
+      setAcceptanceDialog(true);
+      if (clearRequest) clearRequest();
+    }
+  }, [requestedTransaction]);
+
+  React.useEffect(() => {
     const myPublicKey = getPublicKey();
-    if (ActiveTransaction == undefined) return;
+    if (activeTransaction == undefined) return;
     if (selectedDevices.length === 0) return;
 
-    if (ActiveTransaction.sender.user.public_key !== myPublicKey) return;
-
-    gopherSocket.send(WSTypes.USER_SHARE_TARGET, {
-      transaction_id: ActiveTransaction.id,
-      public_keys: selectedDevices,
-    });
-  }, [ActiveTransaction]);
+    if (activeTransaction.sender.user.public_key === myPublicKey) {
+      gopherSocket.send(WSTypes.USER_SHARE_TARGET, {
+        transaction_id: activeTransaction.id,
+        public_keys: selectedDevices,
+      });
+      gopherSocket.send(WSTypes.FILE_SHARE_TARGET, {
+        transaction_id: activeTransaction.id,
+        files: targetFile,
+      });
+    }
+  }, [activeTransaction]);
 
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-900">
@@ -267,6 +276,26 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </Button>
           </CardContent>
         </Card>
+
+        {/* this is for the accept dialog */}
+        <AlertDialog open={acceptanceDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="font-bold text-primary/100 pb-3">Failed to start transaction</AlertDialogTitle>
+              <AlertDialogDescription>
+                "accept"
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+
+            <AlertDialogFooter>
+              <AlertDialogAction onClick={() => { setAcceptanceDialog(false) }}
+                className="p-5"
+              >OK</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* this is for the error dialog */}
         <AlertDialog open={errorDialog} onOpenChange={setErrorDialog}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -274,7 +303,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               <AlertDialogDescription>
                 {targetFile.length <= 0 && "Please select at least one file.\n"}
                 {selectedDevices.length <= 0 && "Please select at least one device.\n"}
-                {(ActiveTransaction && ActiveTransaction.id.length > 0) && "Already in active transaction."}
+                {(activeTransaction && activeTransaction.id.length > 0) && "Already in active transaction."}
               </AlertDialogDescription>
             </AlertDialogHeader>
 
