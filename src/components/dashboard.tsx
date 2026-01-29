@@ -16,7 +16,6 @@ import {
     AlertDialogTitle,
     AlertDialogDescription,
     AlertDialogFooter,
-    AlertDialogCancel,
     AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import { gopherSocket, WSTypes } from "@/lib/ws";
@@ -32,6 +31,7 @@ interface DashboardProps {
     onNavigate: (page: string) => void;
 }
 
+// TODO: save the state (file and target)
 export function Dashboard({ onNavigate }: DashboardProps) {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
     const [AllDevices, setAllDevices] = React.useState<User[]>([]);
@@ -40,6 +40,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     const [ActiveTransaction, setActiveTransaction] = React.useState<Transaction>();
     const [errorDialog, setErrorDialog] = React.useState(false);
 
+    const newTransactionHandler = (data: Transaction) => {
+        console.log(data);
+        setActiveTransaction(data);
+    };
+    gopherSocket.on(WSTypes.NEW_TRANSACTION, newTransactionHandler);
     const startTransaction = () => {
         if (targetFile.length <= 0 || selectedDevices.length <= 0) {
             setErrorDialog(true);
@@ -50,9 +55,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             return;
         }
         gopherSocket.send(WSTypes.NEW_TRANSACTION, null);
-        // setConfirmSend(true);
+        if (ActiveTransaction && selectedDevices) {
+            gopherSocket.send(WSTypes.USER_SHARE_TARGET, { transaction_id: ActiveTransaction.id, public_keys: selectedDevices });
+        }
     };
-    const fileInputRef = React.useRef<HTMLInputElement>(null); // i use shadcn and i have <Input> plaese use that with the file variant
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
     const openFilePicker = () => {
         fileInputRef.current?.click();
     };
@@ -248,8 +255,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                         </AlertDialogHeader>
 
                         <AlertDialogFooter>
-                            <AlertDialogAction onClick={() => {setErrorDialog(false)}}
-                            className="p-5"
+                            <AlertDialogAction onClick={() => { setErrorDialog(false) }}
+                                className="p-5"
                             >OK</AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
