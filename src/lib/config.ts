@@ -23,11 +23,8 @@ export const API_HEADERS: Readonly<Record<string, string>> = {
 export const STORAGE_KEYS = {
   PRIVATE_KEY: 'gdrop_private_key',
   PUBLIC_KEY: 'gdrop_public_key',
-  DEVICE_ID: 'gdrop_device_id',
-  DEVICE_NAME: 'gdrop_device_name',
   THEME: 'gopherdrop-theme',
   TOKEN: 'gdrop_token',
-  DISCOVERABLE: 'gdrop_is_discoverable',
 } as const;
 
 // Optional helper type if you want strict key usage elsewhere

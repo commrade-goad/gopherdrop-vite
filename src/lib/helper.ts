@@ -24,12 +24,6 @@ export const getPrivateKey = (): string | null =>
 export const getPublicKey = (): string | null =>
   localStorage.getItem(STORAGE_KEYS.PUBLIC_KEY);
 
-export const getDeviceName = (): string | null =>
-  localStorage.getItem(STORAGE_KEYS.DEVICE_NAME);
-
-export const getDeviceId = (): string | null =>
-  localStorage.getItem(STORAGE_KEYS.DEVICE_ID);
-
 // ==========================================
 // Cryptographic Functions
 // ==========================================
@@ -101,59 +95,9 @@ export async function signData(
 // ==========================================
 
 export async function initDeviceIdentity(): Promise<void> {
-  let deviceId = localStorage.getItem(STORAGE_KEYS.DEVICE_ID);
-
-  if (!deviceId) {
-    deviceId = crypto.randomUUID();
-    localStorage.setItem(STORAGE_KEYS.DEVICE_ID, deviceId);
-  }
-
-  if (!localStorage.getItem(STORAGE_KEYS.DEVICE_NAME)) {
-    localStorage.setItem(STORAGE_KEYS.DEVICE_NAME, deviceId);
-  }
-
   if (!localStorage.getItem(STORAGE_KEYS.THEME)) {
     localStorage.setItem(STORAGE_KEYS.THEME, 'light');
   }
-}
-
-// ==========================================
-// UI Helpers
-// ==========================================
-
-export async function loadComponent(
-  elementId: string,
-  componentPath: string
-): Promise<void> {
-  const container = document.getElementById(elementId);
-  if (!container) return;
-
-  try {
-    const prefix = window.location.pathname.includes('/pages/')
-      ? '../'
-      : '';
-
-    const response = await fetch(prefix + componentPath);
-    if (!response.ok) {
-      throw new Error(`Failed to load ${componentPath}`);
-    }
-
-    container.innerHTML = await response.text();
-  } catch (error) {
-    console.error('Component Load Error:', error);
-  }
-}
-
-export function updateProfileUI(): void {
-  const nameElements =
-    document.querySelectorAll<HTMLElement>(
-      '#user-name-display, .profile-name'
-    );
-
-  const name = getDeviceName() ?? '';
-  nameElements.forEach(el => {
-    el.textContent = name;
-  });
 }
 
 export function setTheme(theme: 'light' | 'dark' | string): void {

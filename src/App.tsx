@@ -3,76 +3,86 @@ import { Dashboard } from "@/components/dashboard";
 import { Setting } from "@/components/setting";
 import { initAuth } from "@/lib/auth";
 import { gopherSocket, WSTypes } from "@/lib/ws";
+import { Loader2 } from "lucide-react";
 
 export function App() {
-  const [activePage, setActivePage] = React.useState(() => {
-    return localStorage.getItem("gopherdrop-active-page") || "dashboard";
-  });
+    const [activePage, setActivePage] = React.useState(() => {
+        return localStorage.getItem("gopherdrop-active-page") || "dashboard";
+    });
 
-  const [authToken, setAuthToken] = React.useState<string | null>(null);
-  const [authLoading, setAuthLoading] = React.useState(true);
-  const [authError, setAuthError] = React.useState<string | null>(null);
+    const [authToken, setAuthToken] = React.useState<string | null>(null);
+    const [authLoading, setAuthLoading] = React.useState(true);
+    const [authError, setAuthError] = React.useState<string | null>(null);
 
-  const navigate = (page: string) => {
-    setActivePage(page);
-    localStorage.setItem("gopherdrop-active-page", page);
-  };
-
-  React.useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const token = await initAuth();
-        if (!cancelled) {
-          setAuthToken(token);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setAuthError("Authentication failed");
-        }
-      } finally {
-        if (!cancelled) {
-          setAuthLoading(false); // TODO: use setAuthLoading to display some spinner and stuff
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  React.useEffect(() => {
-    if (!authToken) return;
-
-    gopherSocket.connect(authToken);
-
-    const handleUserShareList = (devices: unknown[]) => {
-      console.log("Devices:", devices);
-      // updateDeviceList(devices);
+    const navigate = (page: string) => {
+        setActivePage(page);
+        localStorage.setItem("gopherdrop-active-page", page);
     };
 
-    gopherSocket.on(WSTypes.USER_SHARE_LIST, handleUserShareList);
+    React.useEffect(() => {
+        let cancelled = false;
 
-    return () => {
-      gopherSocket.disconnect();
-    };
-  }, [authToken]);
+        (async () => {
+            try {
+                const token = await initAuth();
+                if (!cancelled) {
+                    setAuthToken(token);
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    setAuthError("Authentication failed");
+                }
+            } finally {
+                if (!cancelled) {
+                    setAuthLoading(false);
+                }
+            }
+        })();
 
-  if (authLoading) {
-    return <div>Authenticating…</div>;
-  }
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
-  if (!authToken) {
-    return <div>Authentication failed with this reason: { authError }</div>;
-  }
+    React.useEffect(() => {
+        if (!authToken) return;
 
-  if (activePage === "settings") {
-      return <Setting onNavigate={navigate} />;
-  }
+        gopherSocket.connect(authToken);
 
-  return <Dashboard onNavigate={navigate} />;
+        const handleUserShareList = (devices: unknown[]) => {
+            console.log("Devices:", devices);
+            // TODO: updateDeviceList(devices);
+        };
+
+        gopherSocket.on(WSTypes.USER_SHARE_LIST, handleUserShareList);
+
+        return () => {
+            gopherSocket.disconnect();
+        };
+    }, [authToken]);
+
+    if (authLoading) {
+        return (
+            <div className="flex min-h-screen items-center justify-center bg-background">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                        Authenticating...
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    if (!authToken) {
+        return <div>Authentication failed with this reason: {authError}</div>;
+    }
+
+    if (activePage === "settings") {
+        return <Setting onNavigate={navigate} />;
+    }
+
+    return <Dashboard onNavigate={navigate} />;
 }
 
 export default App;

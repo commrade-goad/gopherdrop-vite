@@ -19,6 +19,7 @@ export const WSTypes = {
     TRANSACTION_SHARE_ACCEPT: 11,
     WEBRTC_SIGNAL: 12,
     USER_INFO: 13,
+    CONFIG_NAME: 14,
 } as const;
 
 export type WSType = typeof WSTypes[keyof typeof WSTypes];

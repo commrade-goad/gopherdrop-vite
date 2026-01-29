@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/card";
 import { Sidebar } from "@/components/sidebar";
 
+// TODO: export and import actually save the stuff to the server
+
 interface SettingProps {
     onNavigate: (page: string) => void;
 }
@@ -24,14 +26,22 @@ export function Setting({ onNavigate }: SettingProps) {
     const [isDiscoverable, setIsDiscoverable] = React.useState(true);
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
+    // TODO: watch response
     const sendDiscoverableEdit = async (checked: boolean) => {
-        setIsDiscoverable(checked); // optimistic UI
+        setIsDiscoverable(checked);
         gopherSocket.send(WSTypes.CONFIG_DISCOVERABLE, checked);
+    };
+
+    // TODO: watch response
+    const sendUserNameEdit = async (name: string) => {
+        setDeviceName(name);
+        gopherSocket.send(WSTypes.CONFIG_NAME, name);
     };
 
     React.useEffect(() => {
         const handler = (userInfo: any) => {
             setIsDiscoverable(userInfo.is_discoverable);
+            setDeviceName(userInfo.username);
         };
 
         (async () => {
@@ -144,7 +154,7 @@ export function Setting({ onNavigate }: SettingProps) {
                                 <Input
                                     id="device-name"
                                     value={deviceName}
-                                    onChange={(e) => setDeviceName(e.target.value)}
+                                    onChange={(e) => sendUserNameEdit(e.target.value)}
                                 />
                             </div>
                             <div className="flex items-center justify-between rounded-lg border p-4">
@@ -168,7 +178,7 @@ export function Setting({ onNavigate }: SettingProps) {
 
                     <Card>
                         <CardHeader>
-                            <CardTitle>Data Management</CardTitle>
+                            <CardTitle>Data Management <span className="text-bold text-red-500">[TODO]</span></CardTitle>
                             <CardDescription>
                                 Export or import your user data.
                             </CardDescription>

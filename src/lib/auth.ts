@@ -1,6 +1,6 @@
 import { API_BASE_URL, API_HEADERS, STORAGE_KEYS } from "@/lib/config"
 import {
-    getPrivateKey, getPublicKey, getDeviceName,
+    getPrivateKey, getPublicKey,
     generateKeyPair, saveKeys, initDeviceIdentity,
     importPrivateKey, signData
 } from "./helper"
@@ -20,7 +20,6 @@ export const initAuth = async () => {
             privateKey = getPrivateKey();
             publicKey = getPublicKey();
             localStorage.setItem(STORAGE_KEYS.THEME, 'light');
-            localStorage.setItem(STORAGE_KEYS.DISCOVERABLE, 'true');
             window.location.reload();
         } else {
             const token = await performLogin(publicKey);
@@ -47,7 +46,7 @@ const performRegistration = async () => {
         method: 'POST',
         headers: API_HEADERS,
         body: JSON.stringify({
-            username: getDeviceName(),
+            username: crypto.randomUUID(),
             public_key: getPublicKey()
         })
     });
