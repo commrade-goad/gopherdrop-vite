@@ -2,7 +2,7 @@ import * as React from "react";
 import { Dashboard } from "@/components/dashboard";
 import { Setting } from "@/components/setting";
 import { initAuth } from "@/lib/auth";
-import { gopherSocket, WSTypes } from "@/lib/ws";
+import { gopherSocket } from "@/lib/ws";
 import { Loader2 } from "lucide-react";
 
 export function App() {
@@ -48,13 +48,6 @@ export function App() {
         if (!authToken) return;
 
         gopherSocket.connect(authToken);
-
-        const handleUserShareList = (devices: unknown[]) => {
-            console.log("Devices:", devices);
-            // TODO: updateDeviceList(devices);
-        };
-
-        gopherSocket.on(WSTypes.USER_SHARE_LIST, handleUserShareList);
 
         return () => {
             gopherSocket.disconnect();
