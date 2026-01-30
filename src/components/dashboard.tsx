@@ -110,7 +110,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
       interval = window.setInterval(() => {
         gopherSocket.send(WSTypes.START_SHARING, null);
-      }, 5000);
+      }, 3000);
     })();
 
     return () => {
@@ -124,15 +124,24 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     if (activeTransaction == undefined) return;
     if (selectedDevices.length === 0) return;
 
+    const handler = (data: string) => {
+      // TODO: if fail do something here.
+      console.log("got back file share target:", data);
+    }
+    gopherSocket.on(WSTypes.FILE_SHARE_TARGET, handler)
     if (activeTransaction.sender.user.public_key === myPublicKey) {
+      const body = {
+        transaction_id: activeTransaction.id,
+        files: targetFile,
+      }
+      gopherSocket.send(WSTypes.FILE_SHARE_TARGET, body);
       gopherSocket.send(WSTypes.USER_SHARE_TARGET, {
         transaction_id: activeTransaction.id,
         public_keys: selectedDevices,
       });
-      gopherSocket.send(WSTypes.FILE_SHARE_TARGET, {
-        transaction_id: activeTransaction.id,
-        files: targetFile,
-      });
+    }
+    return () => {
+      gopherSocket.off(WSTypes.FILE_SHARE_TARGET, handler)
     }
   }, [activeTransaction]);
 
