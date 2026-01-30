@@ -6,8 +6,8 @@ import {
   RadioIcon,
   FileIcon,
   Files,
-  Smile,
   MenuIcon,
+  TreePalm,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -35,14 +35,13 @@ interface DashboardProps {
 // TODO: the error stuff
 // TODO: save the state (file and target)
 export function Dashboard({ onNavigate }: DashboardProps) {
-  const { activeTransaction, startTransaction: StartTx, clearRequest, requestedTransaction } = useTransaction();
+  const { activeTransaction, startTransaction: StartTx } = useTransaction();
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [AllDevices, setAllDevices] = React.useState<User[]>([]);
   const [selectedDevices, setSelectedDevices] = React.useState<string[]>([]);
   const [targetFile, setTargetFile] = React.useState<GFile[]>([]);
   const [errorDialog, setErrorDialog] = React.useState(false);
-  const [acceptanceDialog, setAcceptanceDialog] = React.useState(false);
 
   const startTransaction = () => {
     if (targetFile.length <= 0 || selectedDevices.length <= 0) {
@@ -70,7 +69,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   };
 
   const decideIcon = () => {
-    if (targetFile.length <= 0) return <Smile className="h-6 w-6 text-background/100" />;
+    if (targetFile.length <= 0) return <TreePalm className="h-6 w-6 text-background/100" />;
     else if (targetFile.length == 1) return <FileIcon className="h-6 w-6 text-background/100" />;
     else return <Files className="h-6 w-6 text-background/100" />;
   }
@@ -119,13 +118,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       gopherSocket.off(WSTypes.USER_SHARE_LIST, deviceListHandler);
     };
   }, []);
-
-  React.useEffect(() => {
-    if (requestedTransaction) {
-      setAcceptanceDialog(true);
-      if (clearRequest) clearRequest();
-    }
-  }, [requestedTransaction]);
 
   React.useEffect(() => {
     const myPublicKey = getPublicKey();
@@ -276,24 +268,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </Button>
           </CardContent>
         </Card>
-
-        {/* this is for the accept dialog */}
-        <AlertDialog open={acceptanceDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="font-bold text-primary/100 pb-3">Failed to start transaction</AlertDialogTitle>
-              <AlertDialogDescription>
-                "accept"
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-
-            <AlertDialogFooter>
-              <AlertDialogAction onClick={() => { setAcceptanceDialog(false) }}
-                className="p-5"
-              >OK</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
 
         {/* this is for the error dialog */}
         <AlertDialog open={errorDialog} onOpenChange={setErrorDialog}>

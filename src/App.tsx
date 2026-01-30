@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Dashboard } from "@/components/dashboard";
 import { Setting } from "@/components/setting";
+import { Notification } from "@/components/notification";
 import { initAuth } from "@/lib/auth";
 import { gopherSocket } from "@/lib/ws";
 import { Loader2 } from "lucide-react";
@@ -78,6 +79,7 @@ export function App() {
         ? <Setting onNavigate={navigate} />
         : <Dashboard onNavigate={navigate} />
       }
+      <Notification/>
     </TransactionProvider>
   );
 }

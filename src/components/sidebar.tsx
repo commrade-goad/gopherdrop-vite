@@ -71,7 +71,7 @@ export function Sidebar({
         <div className="fixed inset-0 z-50 bg-background/100 md:hidden flex flex-col">
           <div className="p-6 flex items-center justify-between border-b border-slate-100">
             <div className="flex items-center gap-3">
-              <div className="bg-cyan-400 p-2 rounded-lg">
+              <div className="bg-primary/100 p-2 rounded-lg">
                 <RocketIcon className="h-6 w-6 text-background/100" />
               </div>
               <span className="font-bold text-xl tracking-tight">
