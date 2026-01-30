@@ -8,6 +8,7 @@ interface TxContextType {
   errorMsg?: string
   startTransaction?: () => void;
   clearRequest?: () => void;
+  SetTransactionFromReq?: () => void;
 }
 
 const TransactionContext = React.createContext<TxContextType | null>(null);
@@ -23,21 +24,26 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
       setActiveTransaction(tx);
     };
 
-    const onAccept = (data: TxAccReq) => {
-      console.log("[TX ACCEPT]", data);
-      if (!requestedTransaction) setRequestedTransaction(data.transaction);
-      else {
+    const onReqGet = (data: TxAccReq) => {
+      console.log("[SOMEONE REQ TX]", data);
+      if (!requestedTransaction) {
+        setRequestedTransaction(data.transaction);
+        localStorage.setItem("gopherdrop-transaction-request", JSON.stringify(requestedTransaction));
+      } else {
         setErrorMsg("Already in transaction wont get new invite");
         console.error(errorMsg);
       }
     };
-
+    const last = localStorage.getItem("gopherdrop-transaction-request");
+    if (!requestedTransaction && last) {
+      setRequestedTransaction(JSON.parse(last));
+    }
     gopherSocket.on(WSTypes.NEW_TRANSACTION, onNewTransaction);
-    gopherSocket.on(WSTypes.TRANSACTION_SHARE_ACCEPT, onAccept);
+    gopherSocket.on(WSTypes.TRANSACTION_SHARE_ACCEPT, onReqGet);
 
     return () => {
       gopherSocket.off(WSTypes.NEW_TRANSACTION, onNewTransaction);
-      gopherSocket.off(WSTypes.TRANSACTION_SHARE_ACCEPT, onAccept);
+      gopherSocket.off(WSTypes.TRANSACTION_SHARE_ACCEPT, onReqGet);
     };
   }, []);
 
@@ -47,10 +53,16 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
 
   const clearRequest = () => {
     setRequestedTransaction(undefined);
+    localStorage.removeItem("gopherdrop-transaction-request");
+  };
+
+  const SetTransactionFromReq = () => {
+    setActiveTransaction(requestedTransaction);
+    clearRequest();
   };
 
   return (
-    <TransactionContext.Provider value={{ activeTransaction, errorMsg, requestedTransaction, startTransaction, clearRequest }}>
+    <TransactionContext.Provider value={{ activeTransaction, errorMsg, requestedTransaction, startTransaction, clearRequest, SetTransactionFromReq }}>
       {children}
     </TransactionContext.Provider>
   );

@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Dashboard } from "@/components/dashboard";
 import { Setting } from "@/components/setting";
+import { Modal } from "@/components/modal";
 import { Notification } from "@/components/notification";
 import { initAuth } from "@/lib/auth";
 import { gopherSocket } from "@/lib/ws";
@@ -80,6 +81,7 @@ export function App() {
         : <Dashboard onNavigate={navigate} />
       }
       <Notification/>
+      <Modal/>
     </TransactionProvider>
   );
 }

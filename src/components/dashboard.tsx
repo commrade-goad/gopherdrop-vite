@@ -28,6 +28,8 @@ import { Input } from "@/components/ui/input";
 import { getPublicKey } from "@/lib/helper";
 import { useTransaction } from "@/context/TransactionContext";
 
+// TODO: send using the publickey so if not discoverable we can send them stuff if we know the publickey
+
 interface DashboardProps {
   onNavigate: (page: string) => void;
 }

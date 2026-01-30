@@ -9,24 +9,26 @@ import {
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import { useTransaction } from "@/context/TransactionContext";
+import { gopherSocket, WSTypes } from "@/lib/ws";
 
-// TODO: restore the requestedTransaction if no action
 export function Notification() {
-  const { clearRequest, requestedTransaction } = useTransaction();
+  const { clearRequest, requestedTransaction, SetTransactionFromReq } = useTransaction();
 
   const AcceptRequest = (status: boolean) => {
     setAcceptanceDialog(false);
     if (status) {
-      // TODO: set the activeTransaction to the requestTransaction value
+      if (SetTransactionFromReq) SetTransactionFromReq();
     }
+    gopherSocket.send(WSTypes.TRANSACTION_SHARE_ACCEPT, {
+      transaction_id: requestedTransaction?.id,
+      accept: status,
+    });
     if (clearRequest) clearRequest();
   };
   const [acceptanceDialog, setAcceptanceDialog] = React.useState(false);
   React.useEffect(() => {
     if (requestedTransaction) {
-      console.log(requestedTransaction);
       setAcceptanceDialog(true);
-      // if (clearRequest) clearRequest();
     }
   }, [requestedTransaction]);
 
@@ -72,9 +74,10 @@ export function Notification() {
 
         <AlertDialogFooter>
           <AlertDialogAction onClick={() => { AcceptRequest(false) }}
-            className="p-5"
+            className="p-5 bg-muted text-foreground hover:bg-muted/80"
           >Decline</AlertDialogAction>
           <AlertDialogAction onClick={() => { AcceptRequest(true) }}
+            autoFocus
             className="p-5"
           >Accept</AlertDialogAction>
         </AlertDialogFooter>
