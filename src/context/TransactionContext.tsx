@@ -1,6 +1,7 @@
 import * as React from "react";
 import { gopherSocket, WSTypes } from "@/lib/ws";
 import { Transaction, TxAccReq } from "@/lib/def";
+import { STORAGE_KEYS } from "@/lib/config";
 
 interface TxContextType {
   activeTransaction?: Transaction;
@@ -32,22 +33,22 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
     const onReqGet = (data: TxAccReq) => {
       if (!requestedTransaction) {
         setRequestedTransaction(data.transaction);
-        localStorage.setItem("gopherdrop-transaction-request", JSON.stringify(data.transaction));
+        localStorage.setItem(STORAGE_KEYS.TRANSACTION_REQ, JSON.stringify(data.transaction));
       } else {
         setErrorMsg("Already in transaction wont get new invite");
         console.error(errorMsg);
       }
     };
 
-    const last = localStorage.getItem("gopherdrop-transaction-request");
+    const last = localStorage.getItem(STORAGE_KEYS.TRANSACTION_REQ);
     if (!requestedTransaction && last) {
       try {
         setRequestedTransaction(JSON.parse(last));
       } catch(_) {
-        localStorage.removeItem("gopherdrop-transaction-request");
+        localStorage.removeItem(STORAGE_KEYS.TRANSACTION_REQ);
       }
     } else {
-      localStorage.removeItem("gopherdrop-transaction-request");
+      localStorage.removeItem(STORAGE_KEYS.TRANSACTION_REQ);
     }
     gopherSocket.on(WSTypes.NEW_TRANSACTION, onNewTransaction);
     gopherSocket.on(WSTypes.TRANSACTION_SHARE_ACCEPT, onReqGet);
@@ -66,7 +67,7 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
 
   const clearRequest = () => {
     setRequestedTransaction(undefined);
-    localStorage.removeItem("gopherdrop-transaction-request");
+    localStorage.removeItem(STORAGE_KEYS.TRANSACTION_REQ);
   };
 
   const SetTransactionFromReq = () => {

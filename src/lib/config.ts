@@ -21,10 +21,12 @@ export const API_HEADERS: Readonly<Record<string, string>> = {
 
 // Storage Keys
 export const STORAGE_KEYS = {
-  PRIVATE_KEY: 'gdrop_private_key',
-  PUBLIC_KEY: 'gdrop_public_key',
-  THEME: 'gopherdrop-theme',
-  TOKEN: 'gdrop_token',
+  PRIVATE_KEY:     'gdrop_private_key',
+  PUBLIC_KEY:      'gdrop_public_key',
+  THEME:           'gdrop-theme',
+  TOKEN:           'gdrop_token',
+  SELECTED_FILE:   'gdrop_sel_file',
+  TRANSACTION_REQ: 'gopherdrop-transaction-request',
 } as const;
 
 // Optional helper type if you want strict key usage elsewhere

@@ -12,10 +12,25 @@ import { Button } from "@/components/ui/button";
 import { getPublicKey } from "@/lib/helper";
 import { useTransaction } from "@/context/TransactionContext";
 
+//TODO: the timer use effect stuff so the user know how many secs left unitl auto continue
 export function Modal() {
   const [openModal, SetOpenModal] = React.useState<boolean>(false);
   const { activeTransaction } = useTransaction();
+  const autoContinueRef = React.useRef<number | null>(null);
   const myPublicKey = getPublicKey();
+
+  const handleContinue = () => {
+    if (autoContinueRef.current) {
+      clearTimeout(autoContinueRef.current);
+      autoContinueRef.current = null;
+    }
+
+    SetOpenModal(false);
+
+    // TODO: trigger your "start transfer" logic
+  };
+
+
   const decideTitle = () => {
     if (activeTransaction?.sender.user.public_key == myPublicKey && !activeTransaction?.started) {
       return "Proceed with the transfer?";
@@ -31,13 +46,39 @@ export function Modal() {
   const renderButton = () => {
     if (activeTransaction?.sender.user.public_key == myPublicKey) {
       return (
-        <Button className="p-5" onClick={() => SetOpenModal(false)}>
+        <Button className="p-5" onClick={handleContinue}>
            Continue
         </Button>
       )
     }
     // NOTE: maybe still render button so the recv can cancel
   };
+
+  React.useEffect(() => {
+    if (!activeTransaction) return;
+
+    const isSender =
+      activeTransaction.sender.user.public_key === myPublicKey &&
+        !activeTransaction.started;
+
+    if (!isSender) return;
+
+    // open modal
+    SetOpenModal(true);
+
+    // start auto-continue timer
+    autoContinueRef.current = window.setTimeout(() => {
+      handleContinue();
+    }, 5000);
+
+    return () => {
+      if (autoContinueRef.current) {
+        clearTimeout(autoContinueRef.current);
+        autoContinueRef.current = null;
+      }
+    };
+  }, [activeTransaction?.id]);
+
 
   React.useEffect(() => {
     if (activeTransaction && activeTransaction !== undefined) {
