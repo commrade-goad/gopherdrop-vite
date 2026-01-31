@@ -27,7 +27,6 @@ import { User, WeirdUserWrapper, GFile } from "@/lib/def";
 import { Input } from "@/components/ui/input";
 import { getPublicKey } from "@/lib/helper";
 import { useTransaction } from "@/context/TransactionContext";
-import { STORAGE_KEYS } from "@/lib/config";
 
 // TODO: send using the publickey so if not discoverable we can send them stuff if we know the publickey
 
@@ -37,7 +36,7 @@ interface DashboardProps {
 
 // TODO: the error stuff
 export function Dashboard({ onNavigate }: DashboardProps) {
-  const { activeTransaction, startTransaction: StartTx } = useTransaction();
+  const { activeTransaction, startTransaction: StartTx, setSelectedFiles } = useTransaction();
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [AllDevices, setAllDevices] = React.useState<User[]>([]);
@@ -69,8 +68,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       type: v.type,
     }));
     setTargetFile(gfiles);
-    // TODO: when done sending delete this
-    localStorage.setItem(STORAGE_KEYS.SELECTED_FILE, JSON.stringify(files));
+    // Store actual File objects in context
+    if (setSelectedFiles) setSelectedFiles(files);
   };
 
   const decideIcon = () => {
