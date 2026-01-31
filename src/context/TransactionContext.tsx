@@ -2,6 +2,7 @@ import * as React from "react";
 import { gopherSocket, WSTypes } from "@/lib/ws";
 import { Transaction, TxAccReq } from "@/lib/def";
 import { STORAGE_KEYS } from "@/lib/config";
+import { request } from "http";
 
 interface TxContextType {
   activeTransaction?: Transaction;
@@ -15,6 +16,7 @@ interface TxContextType {
   SetTransactionFromReq?: () => void;
   setSelectedFiles?: (files: File[]) => void;
   setSelectedTargets?: (targets: Array<{ publicKey: string; username: string }>) => void;
+  resetAllState?: () => void;
 }
 
 const TransactionContext = React.createContext<TxContextType | null>(null);
@@ -86,8 +88,32 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
     clearRequest();
   };
 
+  const resetAllState = () => {
+    if (activeTransaction) gopherSocket.send(WSTypes.DELETE_TRANSACTION, activeTransaction.id);
+    if (requestedTransaction) gopherSocket.send(WSTypes.DELETE_TRANSACTION, requestedTransaction.id);
+    setActiveTransaction(undefined);
+    setRequestedTransaction(undefined);
+    setErrorMsg("");
+    setSelectedFiles([]);
+    setSelectedTargets([]);
+    localStorage.removeItem(STORAGE_KEYS.TRANSACTION_REQ);
+  };
+
   return (
-    <TransactionContext.Provider value={{ activeTransaction, errorMsg, requestedTransaction, selectedFiles, selectedTargets, startTransaction, clearRequest, clearActive, SetTransactionFromReq, setSelectedFiles, setSelectedTargets }}>
+    <TransactionContext.Provider value={{
+      activeTransaction,
+      errorMsg,
+      requestedTransaction,
+      selectedFiles,
+      selectedTargets,
+      startTransaction,
+      clearRequest,
+      clearActive,
+      SetTransactionFromReq,
+      setSelectedFiles,
+      setSelectedTargets,
+      resetAllState
+    }}>
       {children}
     </TransactionContext.Provider>
   );

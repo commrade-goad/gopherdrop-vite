@@ -13,7 +13,6 @@ import { gopherSocket, WSTypes } from "@/lib/ws";
 
 export function Notification() {
   const { clearRequest, requestedTransaction, SetTransactionFromReq } = useTransaction();
-  const [alreadyPopped, setAlreadyPopped] = React.useState(false);
   const [acceptanceDialog, setAcceptanceDialog] = React.useState(false);
 
   const AcceptRequest = (status: boolean) => {
@@ -27,18 +26,21 @@ export function Notification() {
     if (clearRequest) clearRequest();
     setAcceptanceDialog(false);
   };
+
+  // Show dialog whenever requestedTransaction changes
   React.useEffect(() => {
-    if (requestedTransaction !== undefined && !alreadyPopped) {
+    if (requestedTransaction !== undefined) {
       setAcceptanceDialog(true);
-      setAlreadyPopped(true);
+    } else {
+      setAcceptanceDialog(false);
     }
   }, [requestedTransaction]);
 
   return (
     <AlertDialog open={acceptanceDialog}>
-      <AlertDialogContent>
+      <AlertDialogContent className="sm:max-w-lg">
         <AlertDialogHeader>
-          <AlertDialogTitle className="font-bold text-primary/100">
+          <AlertDialogTitle className="font-bold text-primary/100 break-words pr-2">
             {`"${requestedTransaction?.sender.user.username}" want to send you ${requestedTransaction?.files.length} file${ (requestedTransaction?.files && requestedTransaction?.files.length > 1) ? "s" : ""}`}
           </AlertDialogTitle>
         </AlertDialogHeader>
@@ -55,18 +57,18 @@ export function Notification() {
             {requestedTransaction?.files.map((v) => (
               <div
                 key={v.name}
-                className="flex items-center justify-between"
+                className="flex items-center justify-between gap-2 min-w-0"
               >
-                <div className="flex flex-rowi items-center">
-                  <div className="rounded-full h-10 w-10 bg-primary/100 flex items-center justify-center shrink-0 m-3 ml-0">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="rounded-full h-10 w-10 bg-primary/100 flex items-center justify-center shrink-0">
                     <FileIcon className="h-5 w-5 text-background/100" />
                   </div>
 
-                  <p className="font-semibold text-md truncate">
+                  <p className="font-semibold text-md truncate min-w-0">
                     {v.name}
                   </p>
                 </div>
-                <span className="text-xs text-muted-foreground ml-2 shrink-0">
+                <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
                   {(v.size / (1024 * 1024)).toFixed(2)} MB
                 </span>
               </div>
@@ -74,13 +76,13 @@ export function Notification() {
           </div>
         </div>
 
-        <AlertDialogFooter>
+        <AlertDialogFooter className="flex-col sm:flex-row gap-2">
           <AlertDialogAction onClick={() => { AcceptRequest(false) }}
-            className="p-5 bg-muted text-foreground hover:bg-muted/80"
+            className="p-5 bg-muted text-foreground hover:bg-muted/80 w-full sm:w-auto"
           >Decline</AlertDialogAction>
           <AlertDialogAction onClick={() => { AcceptRequest(true) }}
             autoFocus
-            className="p-5"
+            className="p-5 w-full sm:w-auto"
           >Accept</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

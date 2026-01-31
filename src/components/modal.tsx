@@ -1,5 +1,5 @@
 import * as React from "react";
-import { FileIcon } from "lucide-react";
+import { FileIcon, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -16,12 +16,14 @@ import { gopherSocket, WSTypes } from "@/lib/ws";
 
 export function Modal() {
   const [openModal, SetOpenModal] = React.useState<boolean>(false);
-  const { activeTransaction, selectedFiles, selectedTargets, clearActive } = useTransaction();
+  const { activeTransaction, selectedFiles, selectedTargets, resetAllState  } = useTransaction();
   const myPublicKey = getPublicKey() || "";
   const webrtcManagerRef = React.useRef<WebRTCManager | null>(null);
   const [transferProgress, setTransferProgress] = React.useState<Map<string, FileTransferProgress>>(new Map());
   const [isTransferring, setIsTransferring] = React.useState(false);
+  const [allFilesComplete, setAllFilesComplete] = React.useState(false);
   const hasInitializedWebRTC = React.useRef(false);
+const pollIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startFileTransfer = React.useCallback(async () => {
     if (!activeTransaction) return;
@@ -37,12 +39,47 @@ export function Modal() {
   }, [activeTransaction, myPublicKey]);
 
   const handleContinue = React.useCallback(() => {
-    // TODO: change the state of the sender to display the progress too.
-    // SetOpenModal(false);
-
-    // Start the WebRTC file transfer
     startFileTransfer();
   }, [startFileTransfer]);
+
+  // Poll transaction info when receiver is waiting
+  React.useEffect(() => {
+    if (!activeTransaction) return;
+
+    const isSender = activeTransaction.sender.user.public_key === myPublicKey;
+    const isWaiting = !isSender && !activeTransaction.started && !isTransferring;
+
+    if (isWaiting) {
+      // Start polling for transaction info
+      pollIntervalRef.current = setInterval(() => {
+        gopherSocket.send(WSTypes.INFO_TRANSACTION, activeTransaction.id);
+      }, 2000); // Poll every 2 seconds
+
+      // Also set up listener for transaction deletion
+      const handleTransactionDeleted = (data: unknown) => {
+        if (typeof data === 'string' && data === activeTransaction.id) {
+          // Transaction was deleted by sender
+          handleCancel();
+        }
+      };
+
+      gopherSocket.on(WSTypes.DELETE_TRANSACTION, handleTransactionDeleted);
+
+      return () => {
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
+        gopherSocket.off(WSTypes.DELETE_TRANSACTION, handleTransactionDeleted);
+      };
+    } else {
+      // Stop polling if we're not waiting
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    }
+  }, [activeTransaction, myPublicKey, isTransferring]);
 
   // Listen for START_TRANSACTION message to initialize WebRTC
   React.useEffect(() => {
@@ -89,6 +126,10 @@ export function Modal() {
             onError: (targetKey, error) => {
               console.error(`Error sending to ${targetKey}:`, error);
             },
+            onAllFilesComplete: () => {
+              console.log("All files sent successfully");
+              setAllFilesComplete(true);
+            },
           }
         );
 
@@ -127,6 +168,10 @@ export function Modal() {
               },
               onError: (targetKey, error) => {
                 console.error(`Error receiving from ${targetKey}:`, error);
+              },
+              onAllFilesComplete: () => {
+                console.log("All files received successfully");
+                setAllFilesComplete(true);
               },
             }
           );
@@ -177,18 +222,85 @@ export function Modal() {
     }
     return "";
   };
+
   const renderButton = () => {
-    if (isTransferring) {
-      return null; // No button during transfer
+    // Check if all files are complete via the allFilesComplete flag
+    if (allFilesComplete) {
+      return (
+        <Button className="w-full bg-green-600 hover:bg-green-700" onClick={() => handleFinishAndReset()}>
+          Finish & Start New
+        </Button>
+      );
     }
+
+    if (isTransferring) {
+      return null;
+    }
+
     if (activeTransaction?.sender.user.public_key == myPublicKey) {
       return (
-        <Button className="p-5" onClick={handleContinue}>
-           Continue
+        <Button className="p-5 w-full sm:w-auto" onClick={handleContinue}>
+          Continue
         </Button>
-      )
+      );
     }
-    // NOTE: maybe still render button so the recv can cancel
+  };
+
+  const handleFinishAndReset = () => {
+    // Stop polling
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+
+    // Clean up WebRTC
+    if (webrtcManagerRef.current) {
+      webrtcManagerRef.current.destroy();
+      webrtcManagerRef.current = null;
+    }
+
+    // Reset all local state
+    setIsTransferring(false);
+    setAllFilesComplete(false);
+    hasInitializedWebRTC.current = false;
+    setTransferProgress(new Map());
+
+    // Reset context state
+    if (resetAllState) resetAllState();
+
+    // Close modal
+    SetOpenModal(false);
+  };
+
+  const handleCancel = () => {
+    // Stop polling
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+
+    // Clean up WebRTC if it exists
+    if (webrtcManagerRef.current) {
+      webrtcManagerRef.current.destroy();
+      webrtcManagerRef.current = null;
+    }
+
+    // Delete transaction if sender
+    if (activeTransaction && activeTransaction.sender.user.public_key === myPublicKey) {
+      gopherSocket.send(WSTypes.DELETE_TRANSACTION, activeTransaction.id);
+    }
+
+    // Reset all local state
+    setIsTransferring(false);
+    setAllFilesComplete(false);
+    hasInitializedWebRTC.current = false;
+    setTransferProgress(new Map());
+
+    // Reset context state
+    if (resetAllState) resetAllState();
+
+    // Close modal
+    SetOpenModal(false);
   };
 
   React.useEffect(() => {
@@ -199,8 +311,6 @@ export function Modal() {
         !activeTransaction.started;
 
     if (!isSender) return;
-
-    // open modal
     SetOpenModal(true);
 
     return () => {};
@@ -217,8 +327,11 @@ export function Modal() {
   // Cleanup on unmount
   React.useEffect(() => {
     return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
       if (webrtcManagerRef.current) {
-        if (clearActive) clearActive();
         webrtcManagerRef.current.destroy();
         webrtcManagerRef.current = null;
       }
@@ -226,13 +339,30 @@ export function Modal() {
   }, []);
 
     return (
-      <Dialog open={openModal} onOpenChange={SetOpenModal}>
-        <DialogContent className="sm:max-w-lg" showCloseButton={false}>
+      <Dialog open={openModal} onOpenChange={() => {}} modal={true}>
+        <DialogContent
+          className="sm:max-w-lg"
+          showCloseButton={false}
+        >
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-primary/100">{decideTitle()}</DialogTitle>
-            <DialogDescription>
-              {decideDesc()}
-            </DialogDescription>
+            <div className="flex items-start justify-between">
+              <div className="flex-1 pr-8">
+                <DialogTitle className="text-lg font-bold text-primary/100 break-words">{decideTitle()}</DialogTitle>
+                <DialogDescription className="break-words mt-1.5">
+                  {decideDesc()}
+                </DialogDescription>
+              </div>
+              {!isTransferring && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0 rounded-full"
+                  onClick={handleCancel}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </DialogHeader>
 
           <div className="py-4">
@@ -254,14 +384,14 @@ export function Modal() {
                   return (
                     <div
                       key={v.name}
-                      className="flex items-center justify-between"
+                      className="flex items-center justify-between gap-2 min-w-0"
                     >
-                      <div className="flex flex-rowi items-center flex-1">
-                        <div className="rounded-full h-10 w-10 bg-primary/100 flex items-center justify-center shrink-0 m-3 ml-0">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="rounded-full h-10 w-10 bg-primary/100 flex items-center justify-center shrink-0">
                           <FileIcon className="h-5 w-5 text-background/100" />
                         </div>
 
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           <p className="font-semibold text-md truncate">
                             {v.name}
                           </p>
@@ -275,7 +405,7 @@ export function Modal() {
                           )}
                         </div>
                       </div>
-                      <span className="text-xs text-muted-foreground ml-2 shrink-0">
+                      <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
                         {fileProgress
                           ? `${fileProgress.percentage.toFixed(0)}%`
                           : `${(v.size / (1024 * 1024)).toFixed(2)} MB`
@@ -288,7 +418,7 @@ export function Modal() {
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             {renderButton()}
           </DialogFooter>
         </DialogContent>

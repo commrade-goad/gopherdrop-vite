@@ -14,6 +14,7 @@ export interface WebRTCManagerCallbacks {
   onProgress?: (progress: FileTransferProgress) => void;
   onComplete?: (targetKey: string, fileName: string) => void;
   onError?: (targetKey: string, error: Error) => void;
+  onAllFilesComplete?: () => void;
 }
 
 interface PeerConnection {
@@ -29,6 +30,7 @@ export class WebRTCManager {
   private files: File[];
   private callbacks: WebRTCManagerCallbacks;
   private signalHandler: ((data: unknown) => void) | null = null;
+  private completedFiles: Set<string> = new Set();
 
   constructor(
     transactionId: string,
@@ -300,6 +302,9 @@ export class WebRTCManager {
 
     // Send all-files-complete marker
     dataChannel.send(JSON.stringify({ type: "all-files-complete" }));
+
+    // Notify that all files are complete
+    this.callbacks.onAllFilesComplete?.();
   }
 
   /**
@@ -332,10 +337,13 @@ export class WebRTCManager {
             };
           } else if (message.type === "file-end" && currentFile) {
             this.saveReceivedFile(currentFile);
+            this.completedFiles.add(currentFile.name);
             this.callbacks.onComplete?.(senderKey, currentFile.name);
             currentFile = null;
           } else if (message.type === "all-files-complete") {
             console.log("All files received from", senderKey);
+            // Notify that all files are complete
+            this.callbacks.onAllFilesComplete?.();
           }
         } catch {
           // Not JSON, shouldn't happen for string data
@@ -363,11 +371,14 @@ export class WebRTCManager {
               return;
             } else if (message.type === "file-end" && currentFile) {
               this.saveReceivedFile(currentFile);
+              this.completedFiles.add(currentFile.name);
               this.callbacks.onComplete?.(senderKey, currentFile.name);
               currentFile = null;
               return;
             } else if (message.type === "all-files-complete") {
               console.log("All files received from", senderKey);
+              // Notify that all files are complete
+              this.callbacks.onAllFilesComplete?.();
               return;
             }
           } catch {
@@ -430,5 +441,6 @@ export class WebRTCManager {
       peerConn.connection.close();
     }
     this.peers.clear();
+    this.completedFiles.clear();
   }
 }
