@@ -1,41 +1,45 @@
-// import * as React from "react";
-// import {
-//   Dialog,
-//   DialogContent,
-//   DialogHeader,
-//   DialogTitle,
-//   DialogDescription,
-//   DialogFooter,
-// } from "@/components/ui/dialog";
-// import { Button } from "@/components/ui/button";
+import * as React from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { useTransaction } from "@/context/TransactionContext";
 
 export function Modal() {
+  const [openModal, SetOpenModal] = React.useState<boolean>(false);
   const { activeTransaction } = useTransaction();
-  if (activeTransaction) {
-      console.log(activeTransaction);
-      return (
-          <p>test</p>
-          // <Dialog open={open} onOpenChange={onOpenChange}>
-          //   <DialogContent className="sm:max-w-lg">
-          //     <DialogHeader>
-          //       <DialogTitle>Sending Files...</DialogTitle>
-          //       <DialogDescription>
-          //         Your transfer is being prepared — please wait.
-          //       </DialogDescription>
-          //     </DialogHeader>
 
-          //     <div className="py-4">
-          //       {/* your custom body goes here */}
-          //     </div>
+  React.useEffect(() => {
+    if (activeTransaction && activeTransaction !== undefined) {
+      SetOpenModal(true);
+    }
+    return () => {};
+  }, [activeTransaction]);
+    return (
+      <Dialog open={openModal} onOpenChange={SetOpenModal}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Sending Files...</DialogTitle>
+            <DialogDescription>
+                                 Your transfer is being prepared — please wait.
+            </DialogDescription>
+          </DialogHeader>
 
-          //     <DialogFooter>
-          //       <Button onClick={() => onOpenChange(false)}>
-          //         Close
-          //       </Button>
-          //     </DialogFooter>
-          //   </DialogContent>
-          // </Dialog>
-      );
-  }
+          <div className="py-4">
+            {/* your custom body goes here */}
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => SetOpenModal(false)}>
+                                                          Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
 }

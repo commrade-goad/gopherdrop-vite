@@ -84,5 +84,4 @@ export function Notification() {
       </AlertDialogContent>
     </AlertDialog>
   )
-
 }
