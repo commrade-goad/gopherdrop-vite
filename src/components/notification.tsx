@@ -13,22 +13,24 @@ import { gopherSocket, WSTypes } from "@/lib/ws";
 
 export function Notification() {
   const { clearRequest, requestedTransaction, SetTransactionFromReq } = useTransaction();
+  const [alreadyPopped, setAlreadyPopped] = React.useState(false);
+  const [acceptanceDialog, setAcceptanceDialog] = React.useState(false);
 
   const AcceptRequest = (status: boolean) => {
-    setAcceptanceDialog(false);
-    if (status) {
-      if (SetTransactionFromReq) SetTransactionFromReq();
-    }
     gopherSocket.send(WSTypes.TRANSACTION_SHARE_ACCEPT, {
       transaction_id: requestedTransaction?.id,
       accept: status,
     });
+    if (status) {
+      if (SetTransactionFromReq) SetTransactionFromReq();
+    }
     if (clearRequest) clearRequest();
+    setAcceptanceDialog(false);
   };
-  const [acceptanceDialog, setAcceptanceDialog] = React.useState(false);
   React.useEffect(() => {
-    if (requestedTransaction) {
+    if (requestedTransaction !== undefined && !alreadyPopped) {
       setAcceptanceDialog(true);
+      setAlreadyPopped(true);
     }
   }, [requestedTransaction]);
 

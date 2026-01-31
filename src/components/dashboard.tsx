@@ -44,6 +44,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [selectedDevices, setSelectedDevices] = React.useState<string[]>([]);
   const [targetFile, setTargetFile] = React.useState<GFile[]>([]);
   const [errorDialog, setErrorDialog] = React.useState(false);
+  const txInitializedRef = React.useRef<string | null>(null);
 
   const startTransaction = () => {
     if (targetFile.length <= 0 || selectedDevices.length <= 0) {
@@ -123,29 +124,28 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   React.useEffect(() => {
     const myPublicKey = getPublicKey();
-    if (activeTransaction == undefined) return;
+    if (!activeTransaction) return;
     if (selectedDevices.length === 0) return;
 
-    const handler = (data: string) => {
-      // TODO: if fail do something here.
-      console.log("got back file share target:", data);
-    }
-    gopherSocket.on(WSTypes.FILE_SHARE_TARGET, handler)
+    // already handled this transaction
+    if (txInitializedRef.current === activeTransaction.id) return;
+
+    txInitializedRef.current = activeTransaction.id;
+
     if (activeTransaction.sender.user.public_key === myPublicKey) {
-      const body = {
+      gopherSocket.send(WSTypes.FILE_SHARE_TARGET, {
         transaction_id: activeTransaction.id,
         files: targetFile,
-      }
-      gopherSocket.send(WSTypes.FILE_SHARE_TARGET, body);
+      });
+
       gopherSocket.send(WSTypes.USER_SHARE_TARGET, {
         transaction_id: activeTransaction.id,
         public_keys: selectedDevices,
       });
+
+      gopherSocket.send(WSTypes.INFO_TRANSACTION, activeTransaction.id);
     }
-    return () => {
-      gopherSocket.off(WSTypes.FILE_SHARE_TARGET, handler)
-    }
-  }, [activeTransaction]);
+  }, [activeTransaction?.id]);
 
   return (
     <div className="flex min-h-screen bg-slate-50 text-slate-900">

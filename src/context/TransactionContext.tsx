@@ -21,33 +21,42 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
   React.useEffect(() => {
     const onNewTransaction = (tx: Transaction) => {
       setActiveTransaction(tx);
-      console.log("[TX]", tx);
     };
 
+    const onTransactionInfo = (data: Transaction) => {
+      if (data !== undefined) {
+        setActiveTransaction(data);
+      }
+    }
+
     const onReqGet = (data: TxAccReq) => {
-      console.log("[SOMEONE REQ TX]", data);
       if (!requestedTransaction) {
         setRequestedTransaction(data.transaction);
-        if (requestedTransaction !== undefined) {
-          localStorage.setItem("gopherdrop-transaction-request", JSON.stringify(requestedTransaction));
-        }
+        localStorage.setItem("gopherdrop-transaction-request", JSON.stringify(data.transaction));
       } else {
         setErrorMsg("Already in transaction wont get new invite");
         console.error(errorMsg);
       }
     };
+
     const last = localStorage.getItem("gopherdrop-transaction-request");
-    if (!requestedTransaction && last && requestedTransaction !== undefined) {
-      setRequestedTransaction(JSON.parse(last));
+    if (!requestedTransaction && last) {
+      try {
+        setRequestedTransaction(JSON.parse(last));
+      } catch(_) {
+        localStorage.removeItem("gopherdrop-transaction-request");
+      }
     } else {
       localStorage.removeItem("gopherdrop-transaction-request");
     }
     gopherSocket.on(WSTypes.NEW_TRANSACTION, onNewTransaction);
     gopherSocket.on(WSTypes.TRANSACTION_SHARE_ACCEPT, onReqGet);
+    gopherSocket.on(WSTypes.INFO_TRANSACTION, onTransactionInfo);
 
     return () => {
       gopherSocket.off(WSTypes.NEW_TRANSACTION, onNewTransaction);
       gopherSocket.off(WSTypes.TRANSACTION_SHARE_ACCEPT, onReqGet);
+      gopherSocket.off(WSTypes.INFO_TRANSACTION, onTransactionInfo);
     };
   }, []);
 
