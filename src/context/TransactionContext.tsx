@@ -7,9 +7,13 @@ interface TxContextType {
   activeTransaction?: Transaction;
   requestedTransaction?: Transaction;
   errorMsg?: string
+  selectedFiles?: File[];
+  selectedTargets?: Array<{ publicKey: string; username: string }>;
   startTransaction?: () => void;
   clearRequest?: () => void;
   SetTransactionFromReq?: () => void;
+  setSelectedFiles?: (files: File[]) => void;
+  setSelectedTargets?: (targets: Array<{ publicKey: string; username: string }>) => void;
 }
 
 const TransactionContext = React.createContext<TxContextType | null>(null);
@@ -18,6 +22,8 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
   const [activeTransaction, setActiveTransaction] = React.useState<Transaction>();
   const [requestedTransaction, setRequestedTransaction] = React.useState<Transaction>();
   const [errorMsg, setErrorMsg] = React.useState<string>("");
+  const [selectedFiles, setSelectedFiles] = React.useState<File[]>([]);
+  const [selectedTargets, setSelectedTargets] = React.useState<Array<{ publicKey: string; username: string }>>([]);
 
   React.useEffect(() => {
     const onNewTransaction = (tx: Transaction) => {
@@ -76,7 +82,7 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
   };
 
   return (
-    <TransactionContext.Provider value={{ activeTransaction, errorMsg, requestedTransaction, startTransaction, clearRequest, SetTransactionFromReq }}>
+    <TransactionContext.Provider value={{ activeTransaction, errorMsg, requestedTransaction, selectedFiles, selectedTargets, startTransaction, clearRequest, SetTransactionFromReq, setSelectedFiles, setSelectedTargets }}>
       {children}
     </TransactionContext.Provider>
   );
