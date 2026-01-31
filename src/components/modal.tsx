@@ -17,7 +17,7 @@ import { gopherSocket, WSTypes } from "@/lib/ws";
 //TODO: the timer use effect stuff so the user know how many secs left unitl auto continue
 export function Modal() {
   const [openModal, SetOpenModal] = React.useState<boolean>(false);
-  const { activeTransaction, selectedFiles } = useTransaction();
+  const { activeTransaction, selectedFiles, selectedTargets } = useTransaction();
   const autoContinueRef = React.useRef<number | null>(null);
   const myPublicKey = getPublicKey() || "";
   const webrtcManagerRef = React.useRef<WebRTCManager | null>(null);
@@ -59,9 +59,14 @@ export function Modal() {
       const isSender = activeTransaction.sender.user.public_key === myPublicKey;
       
       if (isSender) {
-        // Sender: Initialize WebRTC as initiator
+        // Sender: Initialize WebRTC as initiator to all selected targets
         if (!selectedFiles || selectedFiles.length === 0) {
           console.error("No files selected");
+          return;
+        }
+
+        if (!selectedTargets || selectedTargets.length === 0) {
+          console.error("No targets selected");
           return;
         }
 
@@ -91,10 +96,9 @@ export function Modal() {
 
         webrtcManagerRef.current = manager;
 
-        // Get target users from transaction
-        // Note: The backend doesn't send target info in START_TRANSACTION for sender
-        // We need to track accepted users from TRANSACTION_SHARE_ACCEPT notifications
-        // For now, we'll use a workaround - wait for WebRTC signals
+        // Initialize connections to all selected targets
+        // Only those who accepted will actually connect
+        manager.initAsSender(selectedTargets);
       } else {
         // Receiver: Initialize WebRTC
         if (typeof data === 'object' && data.transaction_id === activeTransaction.id) {
@@ -141,71 +145,7 @@ export function Modal() {
     return () => {
       gopherSocket.off(WSTypes.START_TRANSACTION, handleStartTransaction);
     };
-  }, [activeTransaction, selectedFiles, myPublicKey]);
-
-  // Track accepted users for sender
-  const acceptedUsers = React.useRef<Array<{ publicKey: string; username: string }>>([]);
-
-  React.useEffect(() => {
-    const handleAcceptNotification = (data: any) => {
-      if (!activeTransaction) return;
-      if (activeTransaction.sender.user.public_key !== myPublicKey) return;
-
-      // Handle accept notifications
-      if (data.type === 'accept_notification' && data.transaction_id === activeTransaction.id) {
-        // Find user info - we'll need to get it from the user list
-        // For now, we'll use the username from the notification
-        acceptedUsers.current.push({
-          publicKey: '', // We'll get this from WebRTC signals
-          username: data.username,
-        });
-      }
-    };
-
-    gopherSocket.on(WSTypes.TRANSACTION_SHARE_ACCEPT, handleAcceptNotification);
-
-    return () => {
-      gopherSocket.off(WSTypes.TRANSACTION_SHARE_ACCEPT, handleAcceptNotification);
-    };
-  }, [activeTransaction, myPublicKey]);
-
-  // Initialize sender WebRTC when we receive the first signal from a receiver
-  React.useEffect(() => {
-    const handleWebRTCSignal = (data: any) => {
-      if (!activeTransaction) return;
-      if (!webrtcManagerRef.current) return;
-
-      const isSender = activeTransaction.sender.user.public_key === myPublicKey;
-
-      if (isSender && data.transaction_id === activeTransaction.id) {
-        // Sender receives signal from receiver - check if we need to initialize
-        const fromKey = data.from_key;
-        
-        // Check if we already have a peer for this user
-        // If not, create one (this means the receiver connected first)
-        if (!selectedFiles || selectedFiles.length === 0) return;
-
-        // The WebRTCManager will handle the signal via the listener it set up
-        // We just need to make sure we have targets set
-        const targets = acceptedUsers.current;
-        
-        // If we don't have targets yet, add this user
-        if (targets.length === 0 || !targets.find(t => t.publicKey === fromKey)) {
-          const newTarget = { publicKey: fromKey, username: 'User' };
-          acceptedUsers.current.push(newTarget);
-          
-          // Initialize connection for this user if not already done
-          webrtcManagerRef.current.initAsSender([newTarget]);
-        }
-      }
-    };
-
-    gopherSocket.on(WSTypes.WEBRTC_SIGNAL, handleWebRTCSignal);
-
-    return () => {
-      gopherSocket.off(WSTypes.WEBRTC_SIGNAL, handleWebRTCSignal);
-    };
-  }, [activeTransaction, myPublicKey, selectedFiles]);
+  }, [activeTransaction, selectedFiles, selectedTargets, myPublicKey]);
 
 
   const decideTitle = () => {
