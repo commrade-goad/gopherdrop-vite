@@ -155,7 +155,8 @@ export class WebRTCManager {
 
     channel.onerror = (error) => {
       console.error(`Data channel error with ${username}:`, error);
-      this.callbacks.onError?.(targetKey, new Error('Data channel error'));
+      const errorMsg = error instanceof ErrorEvent ? error.message : 'Data channel error';
+      this.callbacks.onError?.(targetKey, new Error(errorMsg));
     };
 
     channel.onclose = () => {
@@ -189,7 +190,11 @@ export class WebRTCManager {
       const signalData = data as {
         transaction_id: string;
         from_key: string;
-        data: { type: string; sdp?: string; candidate?: RTCIceCandidate };
+        data: { 
+          type: string; 
+          sdp?: string; 
+          candidate?: RTCIceCandidateInit;
+        };
       };
 
       if (signalData.transaction_id !== this.transactionId) return;
@@ -202,9 +207,13 @@ export class WebRTCManager {
 
       try {
         if (signal.type === 'offer') {
+          if (!signal.sdp) {
+            throw new Error('Offer missing SDP');
+          }
+          
           await connection.setRemoteDescription({
             type: 'offer',
-            sdp: signal.sdp!,
+            sdp: signal.sdp,
           });
           
           const answer = await connection.createAnswer();
@@ -216,9 +225,13 @@ export class WebRTCManager {
             data: { type: 'answer', sdp: answer.sdp },
           });
         } else if (signal.type === 'answer') {
+          if (!signal.sdp) {
+            throw new Error('Answer missing SDP');
+          }
+          
           await connection.setRemoteDescription({
             type: 'answer',
-            sdp: signal.sdp!,
+            sdp: signal.sdp,
           });
         } else if (signal.type === 'candidate' && signal.candidate) {
           await connection.addIceCandidate(new RTCIceCandidate(signal.candidate));
