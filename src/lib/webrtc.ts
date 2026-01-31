@@ -46,7 +46,7 @@ export class WebRTCManager {
    */
   async initAsSender(targets: Array<{ publicKey: string; username: string }>) {
     this.setupSignalListener();
-    
+
     for (const target of targets) {
       await this.createPeer(target.publicKey, target.username, true);
     }
@@ -102,13 +102,13 @@ export class WebRTCManager {
       dataChannel = pc.createDataChannel('fileTransfer', {
         ordered: true,
       });
-      
+
       this.setupDataChannel(dataChannel, targetKey, username, true);
 
       // Create and send offer
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      
+
       gopherSocket.send(WSTypes.WEBRTC_SIGNAL, {
         transaction_id: this.transactionId,
         target_key: targetKey,
@@ -140,7 +140,7 @@ export class WebRTCManager {
   ) {
     channel.onopen = () => {
       console.log(`Data channel opened with ${username}`);
-      
+
       // Update peer connection
       const peer = this.peers.get(targetKey);
       if (peer) {
@@ -190,9 +190,9 @@ export class WebRTCManager {
       const signalData = data as {
         transaction_id: string;
         from_key: string;
-        data: { 
-          type: string; 
-          sdp?: string; 
+        data: {
+          type: string;
+          sdp?: string;
           candidate?: RTCIceCandidateInit;
         };
       };
@@ -210,15 +210,15 @@ export class WebRTCManager {
           if (!signal.sdp) {
             throw new Error('Offer missing SDP');
           }
-          
+
           await connection.setRemoteDescription({
             type: 'offer',
             sdp: signal.sdp,
           });
-          
+
           const answer = await connection.createAnswer();
           await connection.setLocalDescription(answer);
-          
+
           gopherSocket.send(WSTypes.WEBRTC_SIGNAL, {
             transaction_id: this.transactionId,
             target_key: signalData.from_key,
@@ -228,7 +228,7 @@ export class WebRTCManager {
           if (!signal.sdp) {
             throw new Error('Answer missing SDP');
           }
-          
+
           await connection.setRemoteDescription({
             type: 'answer',
             sdp: signal.sdp,
@@ -274,7 +274,7 @@ export class WebRTCManager {
       while (offset < totalBytes) {
         const chunk = file.slice(offset, offset + CHUNK_SIZE);
         const arrayBuffer = await chunk.arrayBuffer();
-        
+
         dataChannel.send(arrayBuffer);
 
         offset += CHUNK_SIZE;
@@ -321,7 +321,7 @@ export class WebRTCManager {
       if (typeof data === "string") {
         try {
           const message = JSON.parse(data);
-          
+
           if (message.type === "file-metadata") {
             currentFile = {
               name: message.name,
@@ -345,13 +345,13 @@ export class WebRTCManager {
         // Try to decode as text first to check for JSON
         const view = new Uint8Array(data);
         const firstChar = String.fromCharCode(view[0]);
-        
+
         // If starts with '{', might be JSON
         if (firstChar === '{') {
           try {
             const text = new TextDecoder().decode(data);
             const message = JSON.parse(text);
-            
+
             if (message.type === "file-metadata") {
               currentFile = {
                 name: message.name,

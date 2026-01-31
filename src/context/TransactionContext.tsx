@@ -11,6 +11,7 @@ interface TxContextType {
   selectedTargets?: Array<{ publicKey: string; username: string }>;
   startTransaction?: () => void;
   clearRequest?: () => void;
+  clearActive?: () => void;
   SetTransactionFromReq?: () => void;
   setSelectedFiles?: (files: File[]) => void;
   setSelectedTargets?: (targets: Array<{ publicKey: string; username: string }>) => void;
@@ -76,13 +77,17 @@ export function TransactionProvider({ children }: { children: React.ReactNode })
     localStorage.removeItem(STORAGE_KEYS.TRANSACTION_REQ);
   };
 
+  const clearActive = () => {
+    setActiveTransaction(undefined);
+  };
+
   const SetTransactionFromReq = () => {
     setActiveTransaction(requestedTransaction);
     clearRequest();
   };
 
   return (
-    <TransactionContext.Provider value={{ activeTransaction, errorMsg, requestedTransaction, selectedFiles, selectedTargets, startTransaction, clearRequest, SetTransactionFromReq, setSelectedFiles, setSelectedTargets }}>
+    <TransactionContext.Provider value={{ activeTransaction, errorMsg, requestedTransaction, selectedFiles, selectedTargets, startTransaction, clearRequest, clearActive, SetTransactionFromReq, setSelectedFiles, setSelectedTargets }}>
       {children}
     </TransactionContext.Provider>
   );

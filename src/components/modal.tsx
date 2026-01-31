@@ -14,11 +14,9 @@ import { useTransaction } from "@/context/TransactionContext";
 import { WebRTCManager, FileTransferProgress } from "@/lib/webrtc";
 import { gopherSocket, WSTypes } from "@/lib/ws";
 
-//TODO: the timer use effect stuff so the user know how many secs left unitl auto continue
 export function Modal() {
   const [openModal, SetOpenModal] = React.useState<boolean>(false);
-  const { activeTransaction, selectedFiles, selectedTargets } = useTransaction();
-  const autoContinueRef = React.useRef<number | null>(null);
+  const { activeTransaction, selectedFiles, selectedTargets, clearActive } = useTransaction();
   const myPublicKey = getPublicKey() || "";
   const webrtcManagerRef = React.useRef<WebRTCManager | null>(null);
   const [transferProgress, setTransferProgress] = React.useState<Map<string, FileTransferProgress>>(new Map());
@@ -39,12 +37,8 @@ export function Modal() {
   }, [activeTransaction, myPublicKey]);
 
   const handleContinue = React.useCallback(() => {
-    if (autoContinueRef.current) {
-      clearTimeout(autoContinueRef.current);
-      autoContinueRef.current = null;
-    }
-
-    SetOpenModal(false);
+    // TODO: change the state of the sender to display the progress too.
+    // SetOpenModal(false);
 
     // Start the WebRTC file transfer
     startFileTransfer();
@@ -61,7 +55,7 @@ export function Modal() {
       if (hasInitializedWebRTC.current) return;
 
       const isSender = activeTransaction.sender.user.public_key === myPublicKey;
-      
+
       if (isSender) {
         // Sender: Initialize WebRTC as initiator to all selected targets
         if (!selectedFiles || selectedFiles.length === 0) {
@@ -209,17 +203,7 @@ export function Modal() {
     // open modal
     SetOpenModal(true);
 
-    // start auto-continue timer
-    autoContinueRef.current = window.setTimeout(() => {
-      handleContinue();
-    }, 5000);
-
-    return () => {
-      if (autoContinueRef.current) {
-        clearTimeout(autoContinueRef.current);
-        autoContinueRef.current = null;
-      }
-    };
+    return () => {};
   }, [activeTransaction, handleContinue, myPublicKey]);
 
 
@@ -234,6 +218,7 @@ export function Modal() {
   React.useEffect(() => {
     return () => {
       if (webrtcManagerRef.current) {
+        if (clearActive) clearActive();
         webrtcManagerRef.current.destroy();
         webrtcManagerRef.current = null;
       }
