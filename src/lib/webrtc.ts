@@ -32,14 +32,12 @@ export class WebRTCManager {
   constructor(
     transactionId: string,
     files: File[],
-    myPublicKey: string,
+    _myPublicKey: string,
     callbacks: WebRTCManagerCallbacks = {}
   ) {
     this.transactionId = transactionId;
     this.files = files;
     this.callbacks = callbacks;
-    // myPublicKey is available for future use if needed
-    console.log('WebRTC Manager initialized for', myPublicKey);
   }
 
   /**
@@ -200,14 +198,12 @@ export class WebRTCManager {
     } | null = null;
 
     peer.on("data", (data) => {
-      // Try to parse as JSON (metadata or control message)
-      if (typeof data === "string" || data instanceof Uint8Array) {
+      // Check if it's a string (might be JSON)
+      if (typeof data === "string") {
         try {
-          const text = typeof data === "string" ? data : new TextDecoder().decode(data);
-          const message = JSON.parse(text);
-
+          const message = JSON.parse(data);
+          
           if (message.type === "file-metadata") {
-            // Start receiving a new file
             currentFile = {
               name: message.name,
               size: message.size,
@@ -216,7 +212,6 @@ export class WebRTCManager {
               bytesReceived: 0,
             };
           } else if (message.type === "file-end" && currentFile) {
-            // File transfer complete, save it
             this.saveReceivedFile(currentFile);
             this.callbacks.onComplete?.(senderKey, currentFile.name);
             currentFile = null;
@@ -224,10 +219,40 @@ export class WebRTCManager {
             console.log("All files received from", senderKey);
           }
         } catch (e) {
-          // Not JSON, treat as file chunk
-          if (currentFile && data instanceof ArrayBuffer) {
-            currentFile.chunks.push(data);
-            currentFile.bytesReceived += data.byteLength;
+          // Not JSON, shouldn't happen for string data
+          console.warn("Received non-JSON string data:", data);
+        }
+      } else if (data instanceof Uint8Array) {
+        // Try to parse as JSON control message first
+        try {
+          const text = new TextDecoder().decode(data);
+          const message = JSON.parse(text);
+          
+          if (message.type === "file-metadata") {
+            currentFile = {
+              name: message.name,
+              size: message.size,
+              type: message.fileType,
+              chunks: [],
+              bytesReceived: 0,
+            };
+          } else if (message.type === "file-end" && currentFile) {
+            this.saveReceivedFile(currentFile);
+            this.callbacks.onComplete?.(senderKey, currentFile.name);
+            currentFile = null;
+          } else if (message.type === "all-files-complete") {
+            console.log("All files received from", senderKey);
+          }
+        } catch (e) {
+          // Not JSON, treat as binary file chunk
+          if (currentFile) {
+            const arrayBuffer = data.buffer as ArrayBuffer;
+            const chunk = arrayBuffer.slice(
+              data.byteOffset,
+              data.byteOffset + data.byteLength
+            );
+            currentFile.chunks.push(chunk);
+            currentFile.bytesReceived += chunk.byteLength;
 
             this.callbacks.onProgress?.({
               fileName: currentFile.name,

@@ -105,7 +105,14 @@ export function Modal() {
         manager.initAsSender(selectedTargets);
       } else {
         // Receiver: Initialize WebRTC
-        if (typeof data === 'object' && data.transaction_id === activeTransaction.id) {
+        if (
+          data &&
+          typeof data === 'object' &&
+          !Array.isArray(data) &&
+          data !== null &&
+          'transaction_id' in data &&
+          data.transaction_id === activeTransaction.id
+        ) {
           hasInitializedWebRTC.current = true;
           setIsTransferring(true);
 
@@ -213,8 +220,7 @@ export function Modal() {
         autoContinueRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTransaction?.id, handleContinue, myPublicKey]);
+  }, [activeTransaction, handleContinue, myPublicKey]);
 
 
   React.useEffect(() => {
