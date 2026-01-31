@@ -22,8 +22,9 @@ export function Modal() {
   const [transferProgress, setTransferProgress] = React.useState<Map<string, FileTransferProgress>>(new Map());
   const [isTransferring, setIsTransferring] = React.useState(false);
   const [allFilesComplete, setAllFilesComplete] = React.useState(false);
+  const [connectionFailed, setConnectionFailed] = React.useState(false);
   const hasInitializedWebRTC = React.useRef(false);
-const pollIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollIntervalRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const startFileTransfer = React.useCallback(async () => {
     if (!activeTransaction) return;
@@ -45,7 +46,7 @@ const pollIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null
   // Poll transaction info when receiver is waiting
   React.useEffect(() => {
     if (!activeTransaction) return;
-
+    
     const isSender = activeTransaction.sender.user.public_key === myPublicKey;
     const isWaiting = !isSender && !activeTransaction.started && !isTransferring;
 
@@ -107,6 +108,7 @@ const pollIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null
 
         hasInitializedWebRTC.current = true;
         setIsTransferring(true);
+        setConnectionFailed(false);
 
         const manager = new WebRTCManager(
           activeTransaction.id,
@@ -130,6 +132,11 @@ const pollIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null
               console.log("All files sent successfully");
               setAllFilesComplete(true);
             },
+            onConnectionFailed: () => {
+              console.error("Connection failed after multiple attempts");
+              setConnectionFailed(true);
+              setIsTransferring(false);
+            },
           }
         );
 
@@ -150,6 +157,7 @@ const pollIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null
         ) {
           hasInitializedWebRTC.current = true;
           setIsTransferring(true);
+          setConnectionFailed(false);
 
           const manager = new WebRTCManager(
             activeTransaction.id,
@@ -172,6 +180,11 @@ const pollIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null
               onAllFilesComplete: () => {
                 console.log("All files received successfully");
                 setAllFilesComplete(true);
+              },
+              onConnectionFailed: () => {
+                console.error("Connection failed after multiple attempts");
+                setConnectionFailed(true);
+                setIsTransferring(false);
               },
             }
           );
@@ -199,6 +212,9 @@ const pollIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null
 
 
   const decideTitle = () => {
+    if (connectionFailed) {
+      return "Connection Failed";
+    }
     if (isTransferring) {
       const isSender = activeTransaction?.sender.user.public_key === myPublicKey;
       return isSender ? "Sending files..." : "Receiving files...";
@@ -208,7 +224,11 @@ const pollIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null
     }
     return "Waiting for the sender...";
   }
+  
   const decideDesc = () => {
+    if (connectionFailed) {
+      return "Unable to establish connection after multiple attempts. Please try again.";
+    }
     if (isTransferring) {
       const progressArray = Array.from(transferProgress.values());
       if (progressArray.length > 0) {
@@ -222,8 +242,17 @@ const pollIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null
     }
     return "";
   };
-
+  
   const renderButton = () => {
+    // Check if connection failed
+    if (connectionFailed) {
+      return (
+        <Button className="w-full bg-red-600 hover:bg-red-700" onClick={() => handleFinishAndReset()}>
+          Close & Try Again
+        </Button>
+      );
+    }
+
     // Check if all files are complete via the allFilesComplete flag
     if (allFilesComplete) {
       return (
@@ -234,7 +263,7 @@ const pollIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null
     }
 
     if (isTransferring) {
-      return null;
+      return null; 
     }
 
     if (activeTransaction?.sender.user.public_key == myPublicKey) {
@@ -258,16 +287,17 @@ const pollIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null
       webrtcManagerRef.current.destroy();
       webrtcManagerRef.current = null;
     }
-
+    
     // Reset all local state
     setIsTransferring(false);
     setAllFilesComplete(false);
+    setConnectionFailed(false);
     hasInitializedWebRTC.current = false;
     setTransferProgress(new Map());
-
+    
     // Reset context state
     if (resetAllState) resetAllState();
-
+    
     // Close modal
     SetOpenModal(false);
   };
@@ -289,16 +319,17 @@ const pollIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null
     if (activeTransaction && activeTransaction.sender.user.public_key === myPublicKey) {
       gopherSocket.send(WSTypes.DELETE_TRANSACTION, activeTransaction.id);
     }
-
+    
     // Reset all local state
     setIsTransferring(false);
     setAllFilesComplete(false);
+    setConnectionFailed(false);
     hasInitializedWebRTC.current = false;
     setTransferProgress(new Map());
-
+    
     // Reset context state
     if (resetAllState) resetAllState();
-
+    
     // Close modal
     SetOpenModal(false);
   };
@@ -340,8 +371,8 @@ const pollIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null
 
     return (
       <Dialog open={openModal} onOpenChange={() => {}} modal={true}>
-        <DialogContent
-          className="sm:max-w-lg"
+        <DialogContent 
+          className="sm:max-w-lg" 
           showCloseButton={false}
         >
           <DialogHeader>
