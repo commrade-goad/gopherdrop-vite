@@ -25,19 +25,7 @@ export function Modal() {
   const [isTransferring, setIsTransferring] = React.useState(false);
   const hasInitializedWebRTC = React.useRef(false);
 
-  const handleContinue = () => {
-    if (autoContinueRef.current) {
-      clearTimeout(autoContinueRef.current);
-      autoContinueRef.current = null;
-    }
-
-    SetOpenModal(false);
-
-    // Start the WebRTC file transfer
-    startFileTransfer();
-  };
-
-  const startFileTransfer = async () => {
+  const startFileTransfer = React.useCallback(async () => {
     if (!activeTransaction) return;
 
     const isSender = activeTransaction.sender.user.public_key === myPublicKey;
@@ -48,11 +36,27 @@ export function Modal() {
         transaction_id: activeTransaction.id,
       });
     }
-  };
+  }, [activeTransaction, myPublicKey]);
+
+  const handleContinue = React.useCallback(() => {
+    if (autoContinueRef.current) {
+      clearTimeout(autoContinueRef.current);
+      autoContinueRef.current = null;
+    }
+
+    SetOpenModal(false);
+
+    // Start the WebRTC file transfer
+    startFileTransfer();
+  }, [startFileTransfer]);
 
   // Listen for START_TRANSACTION message to initialize WebRTC
   React.useEffect(() => {
-    const handleStartTransaction = (data: any) => {
+    const handleStartTransaction = (data: {
+      transaction_id?: string;
+      sender?: string;
+      files?: unknown[];
+    }) => {
       if (!activeTransaction) return;
       if (hasInitializedWebRTC.current) return;
 
@@ -209,7 +213,8 @@ export function Modal() {
         autoContinueRef.current = null;
       }
     };
-  }, [activeTransaction?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTransaction?.id, handleContinue, myPublicKey]);
 
 
   React.useEffect(() => {

@@ -158,6 +158,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         setSelectedTargets(targets);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTransaction?.id]);
 
   return (
