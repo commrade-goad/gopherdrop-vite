@@ -1,4 +1,3 @@
-import SimplePeer from "simple-peer";
 import { gopherSocket, WSTypes } from "./ws";
 
 const CHUNK_SIZE = 16384; // 16KB chunks
@@ -18,7 +17,8 @@ export interface WebRTCManagerCallbacks {
 }
 
 interface PeerConnection {
-  peer: SimplePeer.Instance;
+  connection: RTCPeerConnection;
+  dataChannel: RTCDataChannel | null;
   targetKey: string;
   username: string;
 }
@@ -28,6 +28,7 @@ export class WebRTCManager {
   private transactionId: string;
   private files: File[];
   private callbacks: WebRTCManagerCallbacks;
+  private signalHandler: ((data: unknown) => void) | null = null;
 
   constructor(
     transactionId: string,
@@ -44,88 +45,191 @@ export class WebRTCManager {
    * Initialize peer connections as the sender (initiator)
    */
   async initAsSender(targets: Array<{ publicKey: string; username: string }>) {
-    for (const target of targets) {
-      this.createPeer(target.publicKey, target.username, true);
-    }
-
-    // Listen for WebRTC signals from receivers
     this.setupSignalListener();
+    
+    for (const target of targets) {
+      await this.createPeer(target.publicKey, target.username, true);
+    }
   }
 
   /**
    * Initialize peer connection as a receiver
    */
   async initAsReceiver(senderKey: string, senderUsername: string) {
-    this.createPeer(senderKey, senderUsername, false);
     this.setupSignalListener();
+    await this.createPeer(senderKey, senderUsername, false);
   }
 
   /**
-   * Create a peer connection
+   * Create a peer connection using native WebRTC APIs
    */
-  private createPeer(targetKey: string, username: string, initiator: boolean) {
-    const peer = new SimplePeer({
-      initiator,
-      trickle: true,
-    });
+  private async createPeer(targetKey: string, username: string, initiator: boolean) {
+    const configuration: RTCConfiguration = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+      ],
+    };
 
-    this.peers.set(targetKey, { peer, targetKey, username });
+    const pc = new RTCPeerConnection(configuration);
+    let dataChannel: RTCDataChannel | null = null;
 
-    // Handle signaling
-    peer.on("signal", (signal) => {
+    this.peers.set(targetKey, { connection: pc, dataChannel: null, targetKey, username });
+
+    // ICE candidate handling
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        gopherSocket.send(WSTypes.WEBRTC_SIGNAL, {
+          transaction_id: this.transactionId,
+          target_key: targetKey,
+          data: { type: 'candidate', candidate: event.candidate },
+        });
+      }
+    };
+
+    // Connection state changes
+    pc.onconnectionstatechange = () => {
+      console.log(`Connection state with ${username}: ${pc.connectionState}`);
+      if (pc.connectionState === 'connected') {
+        console.log(`WebRTC connected to ${username} (${targetKey})`);
+      } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+        this.callbacks.onError?.(targetKey, new Error(`Connection ${pc.connectionState}`));
+      }
+    };
+
+    if (initiator) {
+      // Sender creates data channel
+      dataChannel = pc.createDataChannel('fileTransfer', {
+        ordered: true,
+      });
+      
+      this.setupDataChannel(dataChannel, targetKey, username, true);
+
+      // Create and send offer
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      
       gopherSocket.send(WSTypes.WEBRTC_SIGNAL, {
         transaction_id: this.transactionId,
         target_key: targetKey,
-        data: signal,
+        data: { type: 'offer', sdp: offer.sdp },
       });
-    });
-
-    // Handle connection establishment
-    peer.on("connect", () => {
-      console.log(`WebRTC connected to ${username} (${targetKey})`);
-      
-      // If we're the sender and connected, start sending files
-      if (initiator) {
-        this.sendFiles(targetKey);
-      }
-    });
-
-    // Handle incoming data (for receivers)
-    if (!initiator) {
-      this.setupReceiver(peer, targetKey);
+    } else {
+      // Receiver waits for data channel
+      pc.ondatachannel = (event) => {
+        dataChannel = event.channel;
+        this.setupDataChannel(dataChannel, targetKey, username, false);
+      };
     }
 
-    // Handle errors
-    peer.on("error", (err) => {
-      console.error(`WebRTC error with ${username}:`, err);
-      this.callbacks.onError?.(targetKey, err);
-    });
+    // Update peer with data channel
+    const peer = this.peers.get(targetKey);
+    if (peer) {
+      peer.dataChannel = dataChannel;
+    }
+  }
 
-    // Handle close
-    peer.on("close", () => {
-      console.log(`WebRTC connection closed with ${username}`);
+  /**
+   * Setup data channel event handlers
+   */
+  private setupDataChannel(
+    channel: RTCDataChannel,
+    targetKey: string,
+    username: string,
+    isSender: boolean
+  ) {
+    channel.onopen = () => {
+      console.log(`Data channel opened with ${username}`);
+      
+      // Update peer connection
+      const peer = this.peers.get(targetKey);
+      if (peer) {
+        peer.dataChannel = channel;
+      }
+
+      // If sender, start sending files
+      if (isSender) {
+        this.sendFiles(targetKey);
+      }
+    };
+
+    channel.onerror = (error) => {
+      console.error(`Data channel error with ${username}:`, error);
+      this.callbacks.onError?.(targetKey, new Error('Data channel error'));
+    };
+
+    channel.onclose = () => {
+      console.log(`Data channel closed with ${username}`);
       this.peers.delete(targetKey);
-    });
+    };
+
+    // Setup receiver
+    if (!isSender) {
+      this.setupReceiver(channel, targetKey);
+    }
   }
 
   /**
    * Setup signal listener for incoming WebRTC signals
    */
   private setupSignalListener() {
-    const handleSignal = (data: {
-      transaction_id: string;
-      from_key: string;
-      data: SimplePeer.SignalData;
-    }) => {
-      if (data.transaction_id !== this.transactionId) return;
+    if (this.signalHandler) return; // Already setup
 
-      const peerConn = this.peers.get(data.from_key);
-      if (peerConn) {
-        peerConn.peer.signal(data.data);
+    this.signalHandler = async (data: unknown) => {
+      if (
+        !data ||
+        typeof data !== 'object' ||
+        !('transaction_id' in data) ||
+        !('from_key' in data) ||
+        !('data' in data)
+      ) {
+        return;
+      }
+
+      const signalData = data as {
+        transaction_id: string;
+        from_key: string;
+        data: { type: string; sdp?: string; candidate?: RTCIceCandidate };
+      };
+
+      if (signalData.transaction_id !== this.transactionId) return;
+
+      const peerConn = this.peers.get(signalData.from_key);
+      if (!peerConn) return;
+
+      const { connection } = peerConn;
+      const signal = signalData.data;
+
+      try {
+        if (signal.type === 'offer') {
+          await connection.setRemoteDescription({
+            type: 'offer',
+            sdp: signal.sdp!,
+          });
+          
+          const answer = await connection.createAnswer();
+          await connection.setLocalDescription(answer);
+          
+          gopherSocket.send(WSTypes.WEBRTC_SIGNAL, {
+            transaction_id: this.transactionId,
+            target_key: signalData.from_key,
+            data: { type: 'answer', sdp: answer.sdp },
+          });
+        } else if (signal.type === 'answer') {
+          await connection.setRemoteDescription({
+            type: 'answer',
+            sdp: signal.sdp!,
+          });
+        } else if (signal.type === 'candidate' && signal.candidate) {
+          await connection.addIceCandidate(new RTCIceCandidate(signal.candidate));
+        }
+      } catch (error) {
+        console.error('Error handling signal:', error);
+        this.callbacks.onError?.(signalData.from_key, error as Error);
       }
     };
 
-    gopherSocket.on(WSTypes.WEBRTC_SIGNAL, handleSignal);
+    gopherSocket.on(WSTypes.WEBRTC_SIGNAL, this.signalHandler);
   }
 
   /**
@@ -133,9 +237,9 @@ export class WebRTCManager {
    */
   private async sendFiles(targetKey: string) {
     const peerConn = this.peers.get(targetKey);
-    if (!peerConn) return;
+    if (!peerConn || !peerConn.dataChannel) return;
 
-    const { peer } = peerConn;
+    const { dataChannel } = peerConn;
 
     for (const file of this.files) {
       // Send file metadata first
@@ -145,7 +249,7 @@ export class WebRTCManager {
         size: file.size,
         fileType: file.type,
       };
-      peer.send(JSON.stringify(metadata));
+      dataChannel.send(JSON.stringify(metadata));
 
       // Wait a bit for metadata to be processed
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -158,7 +262,7 @@ export class WebRTCManager {
         const chunk = file.slice(offset, offset + CHUNK_SIZE);
         const arrayBuffer = await chunk.arrayBuffer();
         
-        peer.send(arrayBuffer);
+        dataChannel.send(arrayBuffer);
 
         offset += CHUNK_SIZE;
 
@@ -176,19 +280,19 @@ export class WebRTCManager {
       }
 
       // Send end-of-file marker
-      peer.send(JSON.stringify({ type: "file-end", name: file.name }));
+      dataChannel.send(JSON.stringify({ type: "file-end", name: file.name }));
 
       this.callbacks.onComplete?.(targetKey, file.name);
     }
 
     // Send all-files-complete marker
-    peer.send(JSON.stringify({ type: "all-files-complete" }));
+    dataChannel.send(JSON.stringify({ type: "all-files-complete" }));
   }
 
   /**
    * Setup receiver logic for incoming files
    */
-  private setupReceiver(peer: SimplePeer.Instance, senderKey: string) {
+  private setupReceiver(channel: RTCDataChannel, senderKey: string) {
     let currentFile: {
       name: string;
       size: number;
@@ -197,7 +301,9 @@ export class WebRTCManager {
       bytesReceived: number;
     } | null = null;
 
-    peer.on("data", (data) => {
+    channel.onmessage = (event) => {
+      const data = event.data;
+
       // Check if it's a string (might be JSON)
       if (typeof data === "string") {
         try {
@@ -218,53 +324,45 @@ export class WebRTCManager {
           } else if (message.type === "all-files-complete") {
             console.log("All files received from", senderKey);
           }
-        } catch (e) {
+        } catch {
           // Not JSON, shouldn't happen for string data
-          console.warn("Received non-JSON string data:", data);
-        }
-      } else if (data instanceof Uint8Array) {
-        // Try to parse as JSON control message first
-        try {
-          const text = new TextDecoder().decode(data);
-          const message = JSON.parse(text);
-          
-          if (message.type === "file-metadata") {
-            currentFile = {
-              name: message.name,
-              size: message.size,
-              type: message.fileType,
-              chunks: [],
-              bytesReceived: 0,
-            };
-          } else if (message.type === "file-end" && currentFile) {
-            this.saveReceivedFile(currentFile);
-            this.callbacks.onComplete?.(senderKey, currentFile.name);
-            currentFile = null;
-          } else if (message.type === "all-files-complete") {
-            console.log("All files received from", senderKey);
-          }
-        } catch (e) {
-          // Not JSON, treat as binary file chunk
-          if (currentFile) {
-            const arrayBuffer = data.buffer as ArrayBuffer;
-            const chunk = arrayBuffer.slice(
-              data.byteOffset,
-              data.byteOffset + data.byteLength
-            );
-            currentFile.chunks.push(chunk);
-            currentFile.bytesReceived += chunk.byteLength;
-
-            this.callbacks.onProgress?.({
-              fileName: currentFile.name,
-              bytesTransferred: currentFile.bytesReceived,
-              totalBytes: currentFile.size,
-              percentage: (currentFile.bytesReceived / currentFile.size) * 100,
-              targetKey: senderKey,
-            });
-          }
+          console.warn("Received non-JSON string data");
         }
       } else if (data instanceof ArrayBuffer) {
-        // Binary data chunk
+        // Try to decode as text first to check for JSON
+        const view = new Uint8Array(data);
+        const firstChar = String.fromCharCode(view[0]);
+        
+        // If starts with '{', might be JSON
+        if (firstChar === '{') {
+          try {
+            const text = new TextDecoder().decode(data);
+            const message = JSON.parse(text);
+            
+            if (message.type === "file-metadata") {
+              currentFile = {
+                name: message.name,
+                size: message.size,
+                type: message.fileType,
+                chunks: [],
+                bytesReceived: 0,
+              };
+              return;
+            } else if (message.type === "file-end" && currentFile) {
+              this.saveReceivedFile(currentFile);
+              this.callbacks.onComplete?.(senderKey, currentFile.name);
+              currentFile = null;
+              return;
+            } else if (message.type === "all-files-complete") {
+              console.log("All files received from", senderKey);
+              return;
+            }
+          } catch {
+            // Not JSON, fall through to treat as binary
+          }
+        }
+
+        // Treat as binary file chunk
         if (currentFile) {
           currentFile.chunks.push(data);
           currentFile.bytesReceived += data.byteLength;
@@ -278,7 +376,7 @@ export class WebRTCManager {
           });
         }
       }
-    });
+    };
   }
 
   /**
@@ -305,8 +403,18 @@ export class WebRTCManager {
    * Cleanup all peer connections
    */
   destroy() {
+    // Remove signal listener
+    if (this.signalHandler) {
+      gopherSocket.off(WSTypes.WEBRTC_SIGNAL, this.signalHandler);
+      this.signalHandler = null;
+    }
+
+    // Close all peer connections
     for (const peerConn of this.peers.values()) {
-      peerConn.peer.destroy();
+      if (peerConn.dataChannel) {
+        peerConn.dataChannel.close();
+      }
+      peerConn.connection.close();
     }
     this.peers.clear();
   }
