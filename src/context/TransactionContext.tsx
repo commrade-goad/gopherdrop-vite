@@ -2,7 +2,6 @@ import * as React from "react";
 import { gopherSocket, WSTypes } from "@/lib/ws";
 import { Transaction, TxAccReq } from "@/lib/def";
 import { STORAGE_KEYS } from "@/lib/config";
-import { request } from "http";
 
 interface TxContextType {
   activeTransaction?: Transaction;

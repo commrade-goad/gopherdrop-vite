@@ -29,3 +29,8 @@ export interface TxRespReq {
   transaction_id: string,
   accept: boolean,
 };
+
+export interface TransactionTarget {
+  user: WeirdUserWrapper,
+  status: number,
+};

@@ -1,22 +1,45 @@
+// todo::fix
+// todo: as sender if the recv decline it will stuck and it behave like the current sender is the recv
+// todo: sometimes the state didnt reset correctly and need server restart to beable to send again( after first send it still finicky sometimes is just broken like that) (send now will no work and will not console anything)
+// todo: dashboard think i still have file selecte when cancel
+// todo: new notification
+// todo: the watcher for the transaction accept still didnt work... it only console log once about the response and never console log it again for the next stuff.
+
 import * as React from "react";
 import { FileIcon, X } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { getPublicKey } from "@/lib/helper";
 import { useTransaction } from "@/context/TransactionContext";
 import { WebRTCManager, FileTransferProgress } from "@/lib/webrtc";
 import { gopherSocket, WSTypes } from "@/lib/ws";
+import { TransactionTarget } from "@/lib/def";
+
+// Custom Modal Component with proper sizing
+function CustomModal({
+  isOpen,
+  children
+}: {
+  isOpen: boolean;
+  children: React.ReactNode;
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Backdrop */}
+      <div className="fixed inset-0 bg-black/50" />
+
+      {/* Modal Container with proper sizing */}
+      <div className="relative z-50 w-full max-w-[calc(100vw-2rem)] sm:max-w-lg max-h-[calc(100vh-2rem)] flex flex-col bg-background rounded-lg shadow-lg">
+        {children}
+      </div>
+    </div>
+  );
+}
 
 export function Modal() {
   const [openModal, SetOpenModal] = React.useState<boolean>(false);
-  const { activeTransaction, selectedFiles, selectedTargets, resetAllState  } = useTransaction();
+  const { activeTransaction, selectedFiles, selectedTargets, resetAllState } = useTransaction();
   const myPublicKey = getPublicKey() || "";
   const webrtcManagerRef = React.useRef<WebRTCManager | null>(null);
   const [transferProgress, setTransferProgress] = React.useState<Map<string, FileTransferProgress>>(new Map());
@@ -24,7 +47,23 @@ export function Modal() {
   const [allFilesComplete, setAllFilesComplete] = React.useState(false);
   const [connectionFailed, setConnectionFailed] = React.useState(false);
   const hasInitializedWebRTC = React.useRef(false);
-  const pollIntervalRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Track target statuses for continue button validation
+  const [canContinue, setCanContinue] = React.useState(true);
+
+  // Use refs to access latest state in interval without restarting it
+  const activeTransactionRef = React.useRef(activeTransaction);
+  const isTransferringRef = React.useRef(isTransferring);
+
+  // Keep refs in sync
+  React.useEffect(() => {
+    activeTransactionRef.current = activeTransaction;
+  }, [activeTransaction]);
+
+  React.useEffect(() => {
+    isTransferringRef.current = isTransferring;
+  }, [isTransferring]);
 
   const startFileTransfer = React.useCallback(async () => {
     if (!activeTransaction) return;
@@ -43,28 +82,56 @@ export function Modal() {
     startFileTransfer();
   }, [startFileTransfer]);
 
-  // Poll transaction info when receiver is waiting
+  // Poll transaction info when waiting
   React.useEffect(() => {
     if (!activeTransaction) return;
-    
-    const isSender = activeTransaction.sender.user.public_key === myPublicKey;
-    const isWaiting = !isSender && !activeTransaction.started && !isTransferring;
 
-    if (isWaiting) {
-      // Start polling for transaction info
+    const isWaitingToStart = !activeTransaction.started && !isTransferring;
+
+    const handleHostRecv = (data: TransactionTarget[]) => {
+      console.log(data);
+      if (!activeTransaction) return;
+
+      const hasSender = data.some(t => t.status === 1);
+      const hasAcceptedReceiver = data.some(t => t.status === 1 || t.status === 3);
+
+      setCanContinue(hasSender || hasAcceptedReceiver);
+    };
+
+    if (isWaitingToStart) {
+      // Clear any existing interval
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+
+      // Start polling
       pollIntervalRef.current = setInterval(() => {
-        gopherSocket.send(WSTypes.INFO_TRANSACTION, activeTransaction.id);
+        const currentTx = activeTransactionRef.current;
+        const currentTransferring = isTransferringRef.current;
+
+        if (!currentTx || currentTransferring) {
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
+          return;
+        }
+
+        console.log('Polling transaction info...');
+        gopherSocket.send(WSTypes.INFO_TRANSACTION, currentTx.id);
+        gopherSocket.send(WSTypes.TRANSACTION_HOST_RECV, {transaction_id: currentTx.id});
       }, 2000); // Poll every 2 seconds
 
-      // Also set up listener for transaction deletion
+      // Listen for transaction deletion
       const handleTransactionDeleted = (data: unknown) => {
         if (typeof data === 'string' && data === activeTransaction.id) {
-          // Transaction was deleted by sender
+          console.log('Transaction was deleted by other party');
           handleCancel();
         }
       };
 
       gopherSocket.on(WSTypes.DELETE_TRANSACTION, handleTransactionDeleted);
+      gopherSocket.on(WSTypes.TRANSACTION_HOST_RECV, handleHostRecv);
 
       return () => {
         if (pollIntervalRef.current) {
@@ -72,6 +139,7 @@ export function Modal() {
           pollIntervalRef.current = null;
         }
         gopherSocket.off(WSTypes.DELETE_TRANSACTION, handleTransactionDeleted);
+        gopherSocket.off(WSTypes.TRANSACTION_HOST_RECV, handleHostRecv);
       };
     } else {
       // Stop polling if we're not waiting
@@ -224,7 +292,7 @@ export function Modal() {
     }
     return "Waiting for the sender...";
   }
-  
+
   const decideDesc = () => {
     if (connectionFailed) {
       return "Unable to establish connection after multiple attempts. Please try again.";
@@ -242,7 +310,7 @@ export function Modal() {
     }
     return "";
   };
-  
+
   const renderButton = () => {
     // Check if connection failed
     if (connectionFailed) {
@@ -263,12 +331,16 @@ export function Modal() {
     }
 
     if (isTransferring) {
-      return null; 
+      return null;
     }
 
     if (activeTransaction?.sender.user.public_key == myPublicKey) {
       return (
-        <Button className="p-5 w-full sm:w-auto" onClick={handleContinue}>
+        <Button
+          className="p-5 w-full sm:w-auto"
+          onClick={handleContinue}
+          disabled={!canContinue}
+        >
           Continue
         </Button>
       );
@@ -287,22 +359,25 @@ export function Modal() {
       webrtcManagerRef.current.destroy();
       webrtcManagerRef.current = null;
     }
-    
+
     // Reset all local state
     setIsTransferring(false);
     setAllFilesComplete(false);
     setConnectionFailed(false);
+    setCanContinue(true);
     hasInitializedWebRTC.current = false;
     setTransferProgress(new Map());
-    
+
     // Reset context state
     if (resetAllState) resetAllState();
-    
+
     // Close modal
     SetOpenModal(false);
   };
 
   const handleCancel = () => {
+    console.log('Cancel button clicked');
+
     // Stop polling
     if (pollIntervalRef.current) {
       clearInterval(pollIntervalRef.current);
@@ -315,21 +390,23 @@ export function Modal() {
       webrtcManagerRef.current = null;
     }
 
-    // Delete transaction if sender
-    if (activeTransaction && activeTransaction.sender.user.public_key === myPublicKey) {
+    // Send DELETE_TRANSACTION if we have an active transaction
+    if (activeTransaction) {
+      console.log('Sending DELETE_TRANSACTION for:', activeTransaction.id);
       gopherSocket.send(WSTypes.DELETE_TRANSACTION, activeTransaction.id);
     }
-    
+
     // Reset all local state
     setIsTransferring(false);
     setAllFilesComplete(false);
     setConnectionFailed(false);
+    setCanContinue(true);
     hasInitializedWebRTC.current = false;
     setTransferProgress(new Map());
-    
+
     // Reset context state
     if (resetAllState) resetAllState();
-    
+
     // Close modal
     SetOpenModal(false);
   };
@@ -345,7 +422,7 @@ export function Modal() {
     SetOpenModal(true);
 
     return () => {};
-  }, [activeTransaction, handleContinue, myPublicKey]);
+  }, [activeTransaction, myPublicKey]);
 
 
   React.useEffect(() => {
@@ -369,90 +446,81 @@ export function Modal() {
     };
   }, []);
 
-    return (
-      <Dialog open={openModal} onOpenChange={() => {}} modal={true}>
-        <DialogContent 
-          className="sm:max-w-lg" 
-          showCloseButton={false}
-        >
-          <DialogHeader>
-            <div className="flex items-start justify-between">
-              <div className="flex-1 pr-8">
-                <DialogTitle className="text-lg font-bold text-primary/100 break-words">{decideTitle()}</DialogTitle>
-                <DialogDescription className="break-words mt-1.5">
-                  {decideDesc()}
-                </DialogDescription>
-              </div>
-              {!isTransferring && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 shrink-0 rounded-full"
-                  onClick={handleCancel}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-          </DialogHeader>
+  return (
+    <CustomModal isOpen={openModal}>
+      {/* Header */}
+      <div className="flex items-start justify-between p-6 border-b">
+        <div className="flex-1 pr-8">
+          <h2 className="text-lg font-bold text-primary break-words">
+            {decideTitle()}
+          </h2>
+          <p className="text-sm text-muted-foreground break-words mt-1.5">
+            {decideDesc()}
+          </p>
+        </div>
+        {!isTransferring && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0 rounded-full"
+            onClick={handleCancel}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
 
-          <div className="py-4">
-            <div className="flex items-start gap-4">
+      {/* Content - Scrollable */}
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex flex-col gap-2">
+          {activeTransaction?.files !== null ? activeTransaction?.files.map((v) => {
+            // Find progress for this file
+            const fileProgress = Array.from(transferProgress.values()).find(
+              p => p.fileName === v.name
+            );
+
+            return (
               <div
-                className="
-                flex flex-col gap-1 flex-1
-                max-h-[12.5rem]
-                overflow-y-auto
-                pr-2
-    "
+                key={v.name}
+                className="flex items-center justify-between gap-2 min-w-0"
               >
-                {activeTransaction?.files !== null ? activeTransaction?.files.map((v) => {
-                  // Find progress for this file
-                  const fileProgress = Array.from(transferProgress.values()).find(
-                    p => p.fileName === v.name
-                  );
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="rounded-full h-10 w-10 bg-primary flex items-center justify-center shrink-0">
+                    <FileIcon className="h-5 w-5 text-background" />
+                  </div>
 
-                  return (
-                    <div
-                      key={v.name}
-                      className="flex items-center justify-between gap-2 min-w-0"
-                    >
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="rounded-full h-10 w-10 bg-primary/100 flex items-center justify-center shrink-0">
-                          <FileIcon className="h-5 w-5 text-background/100" />
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-md truncate">
-                            {v.name}
-                          </p>
-                          {fileProgress && (
-                            <div className="w-full bg-muted h-1 rounded-full mt-1">
-                              <div
-                                className="bg-primary h-1 rounded-full transition-all"
-                                style={{ width: `${fileProgress.percentage}%` }}
-                              />
-                            </div>
-                          )}
-                        </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm truncate">
+                      {v.name}
+                    </p>
+                    {fileProgress && (
+                      <div className="w-full bg-muted h-1 rounded-full mt-1">
+                        <div
+                          className="bg-primary h-1 rounded-full transition-all"
+                          style={{ width: `${fileProgress.percentage}%` }}
+                        />
                       </div>
-                      <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
-                        {fileProgress
-                          ? `${fileProgress.percentage.toFixed(0)}%`
-                          : `${(v.size / (1024 * 1024)).toFixed(2)} MB`
-                        }
-                      </span>
-                    </div>
-                  );
-                }) : ""}
+                    )}
+                  </div>
+                </div>
+                <span className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">
+                  {fileProgress
+                    ? `${fileProgress.percentage.toFixed(0)}%`
+                    : `${(v.size / (1024 * 1024)).toFixed(2)} MB`
+                  }
+                </span>
               </div>
-            </div>
-          </div>
+            );
+          }) : ""}
+        </div>
+      </div>
 
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            {renderButton()}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    );
+      {/* Footer */}
+      <div className="p-6 border-t">
+        <div className="flex flex-col sm:flex-row gap-2">
+          {renderButton()}
+        </div>
+      </div>
+    </CustomModal>
+  );
 }
