@@ -1,8 +1,8 @@
 import { gopherSocket, WSTypes } from "./ws";
 
 const CHUNK_SIZE = 16384; // 16KB chunks
-const MAX_RECONNECT_ATTEMPTS = 3;
-const RECONNECT_DELAY = 2000; // 2 seconds
+const MAX_RECONNECT_ATTEMPTS = 2;
+const RECONNECT_DELAY = 1000; // 2 seconds
 
 export interface FileTransferProgress {
   fileName: string;

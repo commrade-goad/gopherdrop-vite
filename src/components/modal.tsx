@@ -1,6 +1,6 @@
 // group            not implemented
 // save and load    not implemented
-// recv didnt work  idk i give up.
+// recv didnt work  idk i give up. (but we got the msg at TransactionContext.tsx:75) (in the future if we need it)
 
 import * as React from "react";
 import { FileIcon, X } from "lucide-react";
@@ -67,6 +67,7 @@ export function Modal() {
     const isSender = activeTransaction.sender.user.public_key === myPublicKey;
 
     if (isSender) {
+      console.log('Sender starting file transfer for transaction:', activeTransaction.id);
       // Sender: Start transaction and initiate WebRTC
       gopherSocket.send(WSTypes.START_TRANSACTION, {
         transaction_id: activeTransaction.id,
@@ -75,6 +76,7 @@ export function Modal() {
   }, [activeTransaction, myPublicKey]);
 
   const handleContinue = React.useCallback(() => {
+    console.log('Continue button clicked');
     startFileTransfer();
   }, [startFileTransfer]);
 
@@ -103,7 +105,7 @@ export function Modal() {
           return;
         }
 
-        console.log('Polling transaction info...');
+        console.log('Polling transaction info for:', currentTx.id);
         gopherSocket.send(WSTypes.INFO_TRANSACTION, currentTx.id);
       }, 2000); // Poll every 2 seconds
 
@@ -144,6 +146,8 @@ export function Modal() {
       if (!activeTransaction) return;
       if (hasInitializedWebRTC.current) return;
 
+      console.log('START_TRANSACTION message received:', data);
+
       const isSender = activeTransaction.sender.user.public_key === myPublicKey;
 
       if (isSender) {
@@ -158,6 +162,7 @@ export function Modal() {
           return;
         }
 
+        console.log('Initializing WebRTC as sender');
         hasInitializedWebRTC.current = true;
         setIsTransferring(true);
         setConnectionFailed(false);
@@ -207,6 +212,7 @@ export function Modal() {
           'transaction_id' in data &&
           data.transaction_id === activeTransaction.id
         ) {
+          console.log('Initializing WebRTC as receiver');
           hasInitializedWebRTC.current = true;
           setIsTransferring(true);
           setConnectionFailed(false);
@@ -446,6 +452,7 @@ export function Modal() {
   // Cleanup on unmount
   React.useEffect(() => {
     return () => {
+      console.log('Modal unmounting, cleaning up...');
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
         pollIntervalRef.current = null;
