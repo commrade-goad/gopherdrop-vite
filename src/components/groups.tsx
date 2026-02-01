@@ -41,6 +41,8 @@ export function Groups({ onNavigate }: GroupsProps) {
   const [editedMembers, setEditedMembers] = React.useState("");
   const [errorMessage, setErrorMessage] = React.useState("");
 
+  const MEMBER_SEPARATOR = '\n';
+
   const loadGroups = () => {
     const loadedGroups = getGroups();
     setGroups(loadedGroups);
@@ -58,7 +60,7 @@ export function Groups({ onNavigate }: GroupsProps) {
   const handleEditClick = (group: Group) => {
     setEditingGroup(group);
     setEditedName(group.name);
-    setEditedMembers(group.members.join('\n'));
+    setEditedMembers(group.members.join(MEMBER_SEPARATOR));
     setErrorMessage("");
     setEditDialogOpen(true);
   };
@@ -82,7 +84,7 @@ export function Groups({ onNavigate }: GroupsProps) {
 
     // Parse members from textarea (one per line)
     const members = editedMembers
-      .split('\n')
+      .split(MEMBER_SEPARATOR)
       .map(m => m.trim())
       .filter(m => m.length > 0);
 

@@ -59,6 +59,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [groups, setGroups] = React.useState<Group[]>([]);
   const txInitializedRef = React.useRef<string | null>(null);
 
+  const pluralize = (count: number, suffix: string = 's') => count !== 1 ? suffix : '';
+
   const startTransaction = () => {
     if (targetFile.length <= 0 || selectedDevices.length <= 0) {
       setErrorType("transaction");
@@ -278,7 +280,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   variant="secondary"
                   className="bg-foreground/10 text-primary/100 border-0 text-[10px] px-2 py-0.5"
                 >
-                  {groups.length} GROUP{groups.length !== 1 ? 'S' : ''}
+                  {groups.length} GROUP{pluralize(groups.length, 'S')}
                 </Badge>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
@@ -307,7 +309,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                             {group.name}
                           </p>
                           <p className="text-xs text-slate-500">
-                            {group.members.length} member{group.members.length !== 1 ? 's' : ''}
+                            {group.members.length} member{pluralize(group.members.length)}
                           </p>
                         </div>
                       </div>
