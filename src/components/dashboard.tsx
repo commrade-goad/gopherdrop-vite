@@ -28,13 +28,10 @@ import { Input } from "@/components/ui/input";
 import { getPublicKey } from "@/lib/helper";
 import { useTransaction } from "@/context/TransactionContext";
 
-// TODO: send using the publickey so if not discoverable we can send them stuff if we know the publickey
-
 interface DashboardProps {
   onNavigate: (page: string) => void;
 }
 
-// TODO: the error stuff
 export function Dashboard({ onNavigate }: DashboardProps) {
   const { activeTransaction, startTransaction: StartTx, setSelectedFiles, setSelectedTargets } = useTransaction();
 
@@ -56,10 +53,13 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     }
     if (StartTx) StartTx();
   };
+  
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  
   const openFilePicker = () => {
     fileInputRef.current?.click();
   };
+  
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
     const gfiles: GFile[] = files.map((v) => ({
@@ -86,6 +86,19 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       return [...prev, public_key];
     });
   };
+
+  // Clear file selection when activeTransaction is cleared
+  React.useEffect(() => {
+    if (!activeTransaction) {
+      // Reset file selection
+      setTargetFile([]);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      // Reset transaction ref
+      txInitializedRef.current = null;
+    }
+  }, [activeTransaction]);
 
   React.useEffect(() => {
     let interval: number;
@@ -192,7 +205,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4 md:gap-0">
             <div className="flex items-center gap-3">
               <span className="text-xs font-bold tracking-widest text-slate-400 uppercase">
-                                                                                             Online Devices
+                Online Devices
               </span>
               <Badge
                 variant="secondary"
@@ -208,13 +221,13 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 className="gap-2 text-slate-500 hover:text-slate-700"
               >
                 <UserPlusIcon className="h-4 w-4" />
-                                                      Save as Group
+                Save as Group
               </Button>
               <Button className="gap-2 shadow-sm"
                 onClick={() => { startTransaction() }}
               >
                 <SendIcon className="h-4 w-4" />
-                                                  Send Now
+                Send Now
               </Button>
             </div>
           </div>
@@ -227,10 +240,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                   <Card key={user.public_key} onClick={() => registerMember(user.public_key)}
                     className={`
                     p-4 cursor-pointer transition
-                                    ${selected
-                                      ? "ring-2 ring-primary/50 bg-primary/5 text-primary/75"
-                                      : "hover:bg-slate-50 text-foreground/75"}
-                                        `}
+                    ${selected
+                      ? "ring-2 ring-primary/50 bg-primary/5 text-primary/75"
+                      : "hover:bg-slate-50 text-foreground/75"}
+                    `}
                   >
                     <div className="flex items-center gap-4">
                       <div className="rounded-full h-10 w-10 bg-primary/100 flex items-center justify-center">
@@ -256,10 +269,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 </div>
               </div>
               <h3 className="font-bold text-primary/100 text-lg mb-1">
-                                                                        Scanning for devices...
+                Scanning for devices...
               </h3>
               <p className="text-slate-500 text-sm">
-                                                      Ensure other devices enabled the discover settings.
+                Ensure other devices enabled the discover settings.
               </p>
             </div>
           )}
@@ -289,7 +302,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               className="shrink-0 p-5"
               onClick={openFilePicker}
             >
-               Select Files
+              Select Files
             </Button>
           </CardContent>
         </Card>

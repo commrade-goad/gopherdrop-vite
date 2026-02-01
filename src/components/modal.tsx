@@ -1,9 +1,6 @@
-// todo::fix
-// todo: as sender if the recv decline it will stuck and it behave like the current sender is the recv
-// todo: sometimes the state didnt reset correctly and need server restart to beable to send again( after first send it still finicky sometimes is just broken like that) (send now will no work and will not console anything)
-// todo: dashboard think i still have file selecte when cancel
-// todo: new notification
-// todo: the watcher for the transaction accept still didnt work... it only console log once about the response and never console log it again for the next stuff.
+// group            not implemented
+// save and load    not implemented
+// recv didnt work  idk i give up.
 
 import * as React from "react";
 import { FileIcon, X } from "lucide-react";
@@ -12,7 +9,6 @@ import { getPublicKey } from "@/lib/helper";
 import { useTransaction } from "@/context/TransactionContext";
 import { WebRTCManager, FileTransferProgress } from "@/lib/webrtc";
 import { gopherSocket, WSTypes } from "@/lib/ws";
-import { TransactionTarget } from "@/lib/def";
 
 // Custom Modal Component with proper sizing
 function CustomModal({
@@ -88,16 +84,6 @@ export function Modal() {
 
     const isWaitingToStart = !activeTransaction.started && !isTransferring;
 
-    const handleHostRecv = (data: TransactionTarget[]) => {
-      console.log(data);
-      if (!activeTransaction) return;
-
-      const hasSender = data.some(t => t.status === 1);
-      const hasAcceptedReceiver = data.some(t => t.status === 1 || t.status === 3);
-
-      setCanContinue(hasSender || hasAcceptedReceiver);
-    };
-
     if (isWaitingToStart) {
       // Clear any existing interval
       if (pollIntervalRef.current) {
@@ -119,19 +105,18 @@ export function Modal() {
 
         console.log('Polling transaction info...');
         gopherSocket.send(WSTypes.INFO_TRANSACTION, currentTx.id);
-        gopherSocket.send(WSTypes.TRANSACTION_HOST_RECV, {transaction_id: currentTx.id});
       }, 2000); // Poll every 2 seconds
 
       // Listen for transaction deletion
       const handleTransactionDeleted = (data: unknown) => {
+        console.log('DELETE_TRANSACTION received:', data);
         if (typeof data === 'string' && data === activeTransaction.id) {
           console.log('Transaction was deleted by other party');
-          handleCancel();
+          handleCancelCleanupOnly();
         }
       };
 
       gopherSocket.on(WSTypes.DELETE_TRANSACTION, handleTransactionDeleted);
-      gopherSocket.on(WSTypes.TRANSACTION_HOST_RECV, handleHostRecv);
 
       return () => {
         if (pollIntervalRef.current) {
@@ -139,7 +124,6 @@ export function Modal() {
           pollIntervalRef.current = null;
         }
         gopherSocket.off(WSTypes.DELETE_TRANSACTION, handleTransactionDeleted);
-        gopherSocket.off(WSTypes.TRANSACTION_HOST_RECV, handleHostRecv);
       };
     } else {
       // Stop polling if we're not waiting
@@ -306,7 +290,7 @@ export function Modal() {
       return "Establishing connection...";
     }
     if (activeTransaction?.sender.user.public_key == myPublicKey && !activeTransaction?.started) {
-      return "You can wait for the receiver to accept the request.";
+      return "Waiting for receivers to accept...";
     }
     return "";
   };
@@ -348,6 +332,8 @@ export function Modal() {
   };
 
   const handleFinishAndReset = () => {
+    console.log('Finish and reset clicked');
+
     // Stop polling
     if (pollIntervalRef.current) {
       clearInterval(pollIntervalRef.current);
@@ -368,8 +354,10 @@ export function Modal() {
     hasInitializedWebRTC.current = false;
     setTransferProgress(new Map());
 
-    // Reset context state
-    if (resetAllState) resetAllState();
+    // Reset context state (this sends DELETE_TRANSACTION)
+    if (resetAllState) {
+      resetAllState();
+    }
 
     // Close modal
     SetOpenModal(false);
@@ -404,32 +392,55 @@ export function Modal() {
     hasInitializedWebRTC.current = false;
     setTransferProgress(new Map());
 
-    // Reset context state
-    if (resetAllState) resetAllState();
+    // Reset context state (this also sends DELETE_TRANSACTION, but that's okay - duplicate won't hurt)
+    if (resetAllState) {
+      resetAllState();
+    }
+
+    // Close modal
+    SetOpenModal(false);
+  };
+
+  // Cleanup only version (when receiving DELETE from other party)
+  const handleCancelCleanupOnly = () => {
+    console.log('Cleanup only (transaction deleted by other party)');
+
+    // Stop polling
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+
+    // Clean up WebRTC if it exists
+    if (webrtcManagerRef.current) {
+      webrtcManagerRef.current.destroy();
+      webrtcManagerRef.current = null;
+    }
+
+    // Reset all local state
+    setIsTransferring(false);
+    setAllFilesComplete(false);
+    setConnectionFailed(false);
+    setCanContinue(true);
+    hasInitializedWebRTC.current = false;
+    setTransferProgress(new Map());
+
+    // Reset context state but DON'T send DELETE (already deleted)
+    if (resetAllState) {
+      resetAllState();
+    }
 
     // Close modal
     SetOpenModal(false);
   };
 
   React.useEffect(() => {
-    if (!activeTransaction) return;
-
-    const isSender =
-      activeTransaction.sender.user.public_key === myPublicKey &&
-        !activeTransaction.started;
-
-    if (!isSender) return;
-    SetOpenModal(true);
-
-    return () => {};
-  }, [activeTransaction, myPublicKey]);
-
-
-  React.useEffect(() => {
-    if (activeTransaction && activeTransaction !== undefined) {
-      SetOpenModal(true);
+    if (!activeTransaction) {
+      SetOpenModal(false);
+      return;
     }
-    return () => {};
+
+    SetOpenModal(true);
   }, [activeTransaction]);
 
   // Cleanup on unmount
