@@ -51,17 +51,20 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [targetFile, setTargetFile] = React.useState<GFile[]>([]);
   const [errorDialog, setErrorDialog] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState("");
+  const [errorType, setErrorType] = React.useState<"transaction" | "group">("transaction");
   const [saveGroupDialog, setSaveGroupDialog] = React.useState(false);
   const [groupName, setGroupName] = React.useState("");
   const txInitializedRef = React.useRef<string | null>(null);
 
   const startTransaction = () => {
     if (targetFile.length <= 0 || selectedDevices.length <= 0) {
+      setErrorType("transaction");
       setErrorMessage("Please select at least one file and one device.");
       setErrorDialog(true);
       return;
     }
     if (activeTransaction && activeTransaction.id.length > 0) {
+      setErrorType("transaction");
       setErrorMessage("Already in active transaction.");
       setErrorDialog(true);
       return;
@@ -71,6 +74,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   const openSaveGroupDialog = () => {
     if (selectedDevices.length === 0) {
+      setErrorType("group");
       setErrorMessage("Please select at least one device to create a group.");
       setErrorDialog(true);
       return;
@@ -87,6 +91,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       members: selectedDevices,
     });
     if (!success) {
+      setErrorType("group");
       setErrorMessage(`A group named "${groupName.trim()}" already exists. Please choose a different name.`);
       setSaveGroupDialog(false);
       setErrorDialog(true);
@@ -357,7 +362,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle className="font-bold text-primary/100 pb-3">
-                {errorMessage.includes("group") ? "Group Error" : "Failed to start transaction"}
+                {errorType === "group" ? "Group Error" : "Failed to start transaction"}
               </AlertDialogTitle>
               <AlertDialogDescription>
                 {errorMessage || (

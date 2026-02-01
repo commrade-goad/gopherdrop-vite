@@ -142,11 +142,17 @@ export function deleteGroup(groupName: string): void {
   saveGroups(filtered);
 }
 
-export function updateGroup(oldName: string, newGroup: Group): void {
+export function updateGroup(oldName: string, newGroup: Group): boolean {
   const groups = getGroups();
   const index = groups.findIndex(g => g.name === oldName);
-  if (index !== -1) {
-    groups[index] = newGroup;
-    saveGroups(groups);
+  if (index === -1) {
+    return false; // Group to update not found
   }
+  // Check if new name conflicts with another group (excluding the one being updated)
+  if (newGroup.name !== oldName && groups.some(g => g.name === newGroup.name)) {
+    return false; // Duplicate name
+  }
+  groups[index] = newGroup;
+  saveGroups(groups);
+  return true; // Successfully updated
 }
