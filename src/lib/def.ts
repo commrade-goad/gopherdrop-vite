@@ -34,3 +34,8 @@ export interface TransactionTarget {
   user: WeirdUserWrapper,
   status: number,
 };
+
+export interface Group {
+  name: string,
+  members: string[], // Array of public keys (excluding yourself)
+}

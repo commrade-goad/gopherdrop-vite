@@ -17,7 +17,16 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogAction,
+  AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { gopherSocket, WSTypes } from "@/lib/ws";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +34,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Sidebar } from "@/components/sidebar";
 import { User, WeirdUserWrapper, GFile } from "@/lib/def";
 import { Input } from "@/components/ui/input";
-import { getPublicKey } from "@/lib/helper";
+import { Label } from "@/components/ui/label";
+import { getPublicKey, addGroup } from "@/lib/helper";
 import { useTransaction } from "@/context/TransactionContext";
 
 interface DashboardProps {
@@ -40,6 +50,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [selectedDevices, setSelectedDevices] = React.useState<string[]>([]);
   const [targetFile, setTargetFile] = React.useState<GFile[]>([]);
   const [errorDialog, setErrorDialog] = React.useState(false);
+  const [saveGroupDialog, setSaveGroupDialog] = React.useState(false);
+  const [groupName, setGroupName] = React.useState("");
   const txInitializedRef = React.useRef<string | null>(null);
 
   const startTransaction = () => {
@@ -52,6 +64,26 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       return;
     }
     if (StartTx) StartTx();
+  };
+
+  const openSaveGroupDialog = () => {
+    if (selectedDevices.length === 0) {
+      setErrorDialog(true);
+      return;
+    }
+    setSaveGroupDialog(true);
+  };
+
+  const saveGroup = () => {
+    if (!groupName.trim()) {
+      return;
+    }
+    addGroup({
+      name: groupName.trim(),
+      members: selectedDevices,
+    });
+    setGroupName("");
+    setSaveGroupDialog(false);
   };
   
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -219,6 +251,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               <Button
                 variant="ghost"
                 className="gap-2 text-slate-500 hover:text-slate-700"
+                onClick={openSaveGroupDialog}
               >
                 <UserPlusIcon className="h-4 w-4" />
                 Save as Group
@@ -326,6 +359,51 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Save as Group Dialog */}
+        <Dialog open={saveGroupDialog} onOpenChange={setSaveGroupDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="font-bold text-primary/100">Save as Group</DialogTitle>
+              <DialogDescription>
+                Create a group with the selected devices ({selectedDevices.length} device{selectedDevices.length !== 1 ? 's' : ''})
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="group-name">Group Name</Label>
+                <Input
+                  id="group-name"
+                  placeholder="Enter group name..."
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && groupName.trim()) {
+                      saveGroup();
+                    }
+                  }}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button 
+                variant="ghost" 
+                onClick={() => {
+                  setSaveGroupDialog(false);
+                  setGroupName("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={saveGroup}
+                disabled={!groupName.trim()}
+              >
+                Save Group
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

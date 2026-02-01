@@ -1,4 +1,5 @@
 import { STORAGE_KEYS } from './config';
+import { Group } from './def';
 
 // ==========================================
 // Encoding and Decoding Functions
@@ -103,4 +104,44 @@ export async function initDeviceIdentity(): Promise<void> {
 export function setTheme(theme: 'light' | 'dark' | string): void {
   localStorage.setItem(STORAGE_KEYS.THEME, theme);
   document.documentElement.setAttribute('data-theme', theme);
+}
+
+// ==========================================
+// Group Management Functions
+// ==========================================
+
+export function getGroups(): Group[] {
+  const groupsData = localStorage.getItem(STORAGE_KEYS.GROUPS);
+  if (!groupsData) return [];
+  try {
+    return JSON.parse(groupsData);
+  } catch (e) {
+    console.error('Error parsing groups:', e);
+    return [];
+  }
+}
+
+export function saveGroups(groups: Group[]): void {
+  localStorage.setItem(STORAGE_KEYS.GROUPS, JSON.stringify(groups));
+}
+
+export function addGroup(group: Group): void {
+  const groups = getGroups();
+  groups.push(group);
+  saveGroups(groups);
+}
+
+export function deleteGroup(groupName: string): void {
+  const groups = getGroups();
+  const filtered = groups.filter(g => g.name !== groupName);
+  saveGroups(filtered);
+}
+
+export function updateGroup(oldName: string, newGroup: Group): void {
+  const groups = getGroups();
+  const index = groups.findIndex(g => g.name === oldName);
+  if (index !== -1) {
+    groups[index] = newGroup;
+    saveGroups(groups);
+  }
 }
