@@ -26,6 +26,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
+const MEMBER_SEPARATOR = '\n';
+
 interface GroupsProps {
   onNavigate: (page: string) => void;
 }
@@ -40,8 +42,6 @@ export function Groups({ onNavigate }: GroupsProps) {
   const [editedName, setEditedName] = React.useState("");
   const [editedMembers, setEditedMembers] = React.useState("");
   const [errorMessage, setErrorMessage] = React.useState("");
-
-  const MEMBER_SEPARATOR = '\n';
 
   const loadGroups = () => {
     const loadedGroups = getGroups();

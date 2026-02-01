@@ -40,6 +40,8 @@ import { useTransaction } from "@/context/TransactionContext";
 import { Group } from "@/lib/def";
 import { UsersIcon } from "lucide-react";
 
+const pluralize = (count: number, suffix: string = 's') => count !== 1 ? suffix : '';
+
 interface DashboardProps {
   onNavigate: (page: string) => void;
 }
@@ -58,8 +60,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [groupName, setGroupName] = React.useState("");
   const [groups, setGroups] = React.useState<Group[]>([]);
   const txInitializedRef = React.useRef<string | null>(null);
-
-  const pluralize = (count: number, suffix: string = 's') => count !== 1 ? suffix : '';
 
   const startTransaction = () => {
     if (targetFile.length <= 0 || selectedDevices.length <= 0) {
