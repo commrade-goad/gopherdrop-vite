@@ -125,10 +125,15 @@ export function saveGroups(groups: Group[]): void {
   localStorage.setItem(STORAGE_KEYS.GROUPS, JSON.stringify(groups));
 }
 
-export function addGroup(group: Group): void {
+export function addGroup(group: Group): boolean {
   const groups = getGroups();
+  // Check for duplicate group names
+  if (groups.some(g => g.name === group.name)) {
+    return false; // Group with this name already exists
+  }
   groups.push(group);
   saveGroups(groups);
+  return true; // Successfully added
 }
 
 export function deleteGroup(groupName: string): void {

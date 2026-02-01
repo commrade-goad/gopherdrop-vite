@@ -50,16 +50,19 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [selectedDevices, setSelectedDevices] = React.useState<string[]>([]);
   const [targetFile, setTargetFile] = React.useState<GFile[]>([]);
   const [errorDialog, setErrorDialog] = React.useState(false);
+  const [errorMessage, setErrorMessage] = React.useState("");
   const [saveGroupDialog, setSaveGroupDialog] = React.useState(false);
   const [groupName, setGroupName] = React.useState("");
   const txInitializedRef = React.useRef<string | null>(null);
 
   const startTransaction = () => {
     if (targetFile.length <= 0 || selectedDevices.length <= 0) {
+      setErrorMessage("Please select at least one file and one device.");
       setErrorDialog(true);
       return;
     }
     if (activeTransaction && activeTransaction.id.length > 0) {
+      setErrorMessage("Already in active transaction.");
       setErrorDialog(true);
       return;
     }
@@ -68,6 +71,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   const openSaveGroupDialog = () => {
     if (selectedDevices.length === 0) {
+      setErrorMessage("Please select at least one device to create a group.");
       setErrorDialog(true);
       return;
     }
@@ -78,12 +82,20 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     if (!groupName.trim()) {
       return;
     }
-    addGroup({
+    const success = addGroup({
       name: groupName.trim(),
       members: selectedDevices,
     });
+    if (!success) {
+      setErrorMessage(`A group named "${groupName.trim()}" already exists. Please choose a different name.`);
+      setSaveGroupDialog(false);
+      setErrorDialog(true);
+      setGroupName("");
+      return;
+    }
     setGroupName("");
     setSaveGroupDialog(false);
+    // Success - user can see the group in the Groups page
   };
   
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -344,16 +356,25 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         <AlertDialog open={errorDialog} onOpenChange={setErrorDialog}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle className="font-bold text-primary/100 pb-3">Failed to start transaction</AlertDialogTitle>
+              <AlertDialogTitle className="font-bold text-primary/100 pb-3">
+                {errorMessage.includes("group") ? "Group Error" : "Failed to start transaction"}
+              </AlertDialogTitle>
               <AlertDialogDescription>
-                {targetFile.length <= 0 && "Please select at least one file.\n"}
-                {selectedDevices.length <= 0 && "Please select at least one device.\n"}
-                {(activeTransaction && activeTransaction.id.length > 0) && "Already in active transaction."}
+                {errorMessage || (
+                  <>
+                    {targetFile.length <= 0 && "Please select at least one file.\n"}
+                    {selectedDevices.length <= 0 && "Please select at least one device.\n"}
+                    {(activeTransaction && activeTransaction.id.length > 0) && "Already in active transaction."}
+                  </>
+                )}
               </AlertDialogDescription>
             </AlertDialogHeader>
 
             <AlertDialogFooter>
-              <AlertDialogAction onClick={() => { setErrorDialog(false) }}
+              <AlertDialogAction onClick={() => { 
+                setErrorDialog(false);
+                setErrorMessage("");
+              }}
                 className="p-5"
               >OK</AlertDialogAction>
             </AlertDialogFooter>
