@@ -37,5 +37,5 @@ export interface TransactionTarget {
 
 export interface Group {
   name: string,
-  members: string[], // Array of public keys (excluding yourself)
+  members: string[], // Array of public keys
 }

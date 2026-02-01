@@ -379,6 +379,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               <AlertDialogAction onClick={() => { 
                 setErrorDialog(false);
                 setErrorMessage("");
+                setErrorType("transaction");
               }}
                 className="p-5"
               >OK</AlertDialogAction>
