@@ -35,8 +35,10 @@ import { Sidebar } from "@/components/sidebar";
 import { User, WeirdUserWrapper, GFile } from "@/lib/def";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { getPublicKey, addGroup } from "@/lib/helper";
+import { getPublicKey, addGroup, getGroups } from "@/lib/helper";
 import { useTransaction } from "@/context/TransactionContext";
+import { Group } from "@/lib/def";
+import { UsersIcon } from "lucide-react";
 
 interface DashboardProps {
   onNavigate: (page: string) => void;
@@ -54,6 +56,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [errorType, setErrorType] = React.useState<"transaction" | "group">("transaction");
   const [saveGroupDialog, setSaveGroupDialog] = React.useState(false);
   const [groupName, setGroupName] = React.useState("");
+  const [groups, setGroups] = React.useState<Group[]>([]);
   const txInitializedRef = React.useRef<string | null>(null);
 
   const startTransaction = () => {
@@ -100,7 +103,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     }
     setGroupName("");
     setSaveGroupDialog(false);
-    // Success - user can see the group in the Groups page
+    // Reload groups after successful save
+    const loadedGroups = getGroups();
+    setGroups(loadedGroups);
   };
   
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -136,6 +141,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     });
   };
 
+  const selectGroup = (group: Group) => {
+    // Select all members from the group
+    setSelectedDevices(group.members);
+  };
+
   // Clear file selection when activeTransaction is cleared
   React.useEffect(() => {
     if (!activeTransaction) {
@@ -148,6 +158,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       txInitializedRef.current = null;
     }
   }, [activeTransaction]);
+
+  // Load groups from localStorage
+  React.useEffect(() => {
+    const loadedGroups = getGroups();
+    setGroups(loadedGroups);
+  }, []);
 
   React.useEffect(() => {
     let interval: number;
@@ -251,6 +267,57 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
         {/* Content */}
         <div className="flex-1 p-4 md:p-8 bg-slate-50/50">
+          {/* Groups Section */}
+          {groups.length > 0 && (
+            <div className="mb-8">
+              <div className="flex items-center gap-3 mb-4">
+                <span className="text-xs font-bold tracking-widest text-slate-400 uppercase">
+                  Saved Groups
+                </span>
+                <Badge
+                  variant="secondary"
+                  className="bg-foreground/10 text-primary/100 border-0 text-[10px] px-2 py-0.5"
+                >
+                  {groups.length} GROUP{groups.length !== 1 ? 'S' : ''}
+                </Badge>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+                {groups.map((group) => {
+                  // Check if all group members are selected
+                  const isSelected = group.members.length > 0 && 
+                    group.members.every(member => selectedDevices.includes(member));
+                  return (
+                    <Card 
+                      key={group.name} 
+                      onClick={() => selectGroup(group)}
+                      className={`
+                        p-4 cursor-pointer transition
+                        ${isSelected
+                          ? "ring-2 ring-primary/50 bg-primary/5 text-primary/75"
+                          : "hover:bg-slate-50 text-foreground/75"}
+                      `}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="rounded-full h-10 w-10 bg-primary/100 flex items-center justify-center">
+                          <UsersIcon className="h-5 w-5 text-background/100" />
+                        </div>
+
+                        <div className="flex-1">
+                          <p className="font-semibold text-md">
+                            {group.name}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {group.members.length} member{group.members.length !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4 md:gap-0">
             <div className="flex items-center gap-3">
               <span className="text-xs font-bold tracking-widest text-slate-400 uppercase">

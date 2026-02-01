@@ -1,10 +1,12 @@
 import * as React from "react";
-import { MenuIcon, UsersIcon, TrashIcon, PlusIcon } from "lucide-react";
+import { MenuIcon, UsersIcon, TrashIcon, PlusIcon, EditIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Sidebar } from "@/components/sidebar";
-import { getGroups, deleteGroup } from "@/lib/helper";
+import { getGroups, deleteGroup, updateGroup } from "@/lib/helper";
 import { Group } from "@/lib/def";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,6 +17,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 interface GroupsProps {
   onNavigate: (page: string) => void;
@@ -25,6 +35,11 @@ export function Groups({ onNavigate }: GroupsProps) {
   const [groups, setGroups] = React.useState<Group[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [groupToDelete, setGroupToDelete] = React.useState<string | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = React.useState(false);
+  const [editingGroup, setEditingGroup] = React.useState<Group | null>(null);
+  const [editedName, setEditedName] = React.useState("");
+  const [editedMembers, setEditedMembers] = React.useState("");
+  const [errorMessage, setErrorMessage] = React.useState("");
 
   const loadGroups = () => {
     const loadedGroups = getGroups();
@@ -40,6 +55,14 @@ export function Groups({ onNavigate }: GroupsProps) {
     setDeleteDialogOpen(true);
   };
 
+  const handleEditClick = (group: Group) => {
+    setEditingGroup(group);
+    setEditedName(group.name);
+    setEditedMembers(group.members.join('\n'));
+    setErrorMessage("");
+    setEditDialogOpen(true);
+  };
+
   const confirmDelete = () => {
     if (groupToDelete) {
       deleteGroup(groupToDelete);
@@ -47,6 +70,41 @@ export function Groups({ onNavigate }: GroupsProps) {
       setGroupToDelete(null);
     }
     setDeleteDialogOpen(false);
+  };
+
+  const saveEdit = () => {
+    if (!editingGroup) return;
+    
+    if (!editedName.trim()) {
+      setErrorMessage("Group name cannot be empty");
+      return;
+    }
+
+    // Parse members from textarea (one per line)
+    const members = editedMembers
+      .split('\n')
+      .map(m => m.trim())
+      .filter(m => m.length > 0);
+
+    if (members.length === 0) {
+      setErrorMessage("Group must have at least one member");
+      return;
+    }
+
+    const success = updateGroup(editingGroup.name, {
+      name: editedName.trim(),
+      members: members,
+    });
+
+    if (!success) {
+      setErrorMessage(`A group named "${editedName.trim()}" already exists`);
+      return;
+    }
+
+    loadGroups();
+    setEditDialogOpen(false);
+    setEditingGroup(null);
+    setErrorMessage("");
   };
 
   return (
@@ -115,14 +173,30 @@ export function Groups({ onNavigate }: GroupsProps) {
                         </div>
                       </div>
 
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50 shrink-0"
-                        onClick={() => handleDeleteClick(group.name)}
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-2 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditClick(group);
+                          }}
+                        >
+                          <EditIcon className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteClick(group.name);
+                          }}
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -170,6 +244,59 @@ export function Groups({ onNavigate }: GroupsProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-bold text-primary/100">Edit Group</DialogTitle>
+            <DialogDescription>
+              Edit the group name and members (one public key per line)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-group-name">Group Name</Label>
+              <Input
+                id="edit-group-name"
+                placeholder="Enter group name..."
+                value={editedName}
+                onChange={(e) => setEditedName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-members">Members (one public key per line)</Label>
+              <textarea
+                id="edit-members"
+                className="flex min-h-[200px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                placeholder="Enter public keys (one per line)..."
+                value={editedMembers}
+                onChange={(e) => setEditedMembers(e.target.value)}
+              />
+            </div>
+            {errorMessage && (
+              <p className="text-sm text-red-500">{errorMessage}</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="ghost" 
+              onClick={() => {
+                setEditDialogOpen(false);
+                setEditingGroup(null);
+                setErrorMessage("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={saveEdit}
+              disabled={!editedName.trim()}
+            >
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
