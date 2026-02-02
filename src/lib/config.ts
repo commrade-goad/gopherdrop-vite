@@ -6,7 +6,7 @@ const IS_LOCALHOST: boolean = isBrowser
   : false;
 
 // URL Config
-const PROD_HOST = 'ahmad-heliochromic-astoundedly.ngrok-free.dev';
+const PROD_HOST = 'mulyono.tailf5d620.ts.net';
 const LOCAL_HOST = 'localhost:8080';
 
 export const API_BASE_URL: string = IS_LOCALHOST
