@@ -17,7 +17,16 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogAction,
+  AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { gopherSocket, WSTypes } from "@/lib/ws";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,8 +34,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Sidebar } from "@/components/sidebar";
 import { User, WeirdUserWrapper, GFile } from "@/lib/def";
 import { Input } from "@/components/ui/input";
-import { getPublicKey } from "@/lib/helper";
+import { Label } from "@/components/ui/label";
+import { getPublicKey, addGroup, getGroups } from "@/lib/helper";
 import { useTransaction } from "@/context/TransactionContext";
+import { Group } from "@/lib/def";
+import { UsersIcon } from "lucide-react";
+
+const pluralize = (count: number, suffix: string = 's') => count !== 1 ? suffix : '';
 
 interface DashboardProps {
   onNavigate: (page: string) => void;
@@ -40,18 +54,60 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [selectedDevices, setSelectedDevices] = React.useState<string[]>([]);
   const [targetFile, setTargetFile] = React.useState<GFile[]>([]);
   const [errorDialog, setErrorDialog] = React.useState(false);
+  const [errorMessage, setErrorMessage] = React.useState("");
+  const [errorType, setErrorType] = React.useState<"transaction" | "group">("transaction");
+  const [saveGroupDialog, setSaveGroupDialog] = React.useState(false);
+  const [groupName, setGroupName] = React.useState("");
+  const [groups, setGroups] = React.useState<Group[]>([]);
   const txInitializedRef = React.useRef<string | null>(null);
 
   const startTransaction = () => {
     if (targetFile.length <= 0 || selectedDevices.length <= 0) {
+      setErrorType("transaction");
+      setErrorMessage("Please select at least one file and one device.");
       setErrorDialog(true);
       return;
     }
     if (activeTransaction && activeTransaction.id.length > 0) {
+      setErrorType("transaction");
+      setErrorMessage("Already in active transaction.");
       setErrorDialog(true);
       return;
     }
     if (StartTx) StartTx();
+  };
+
+  const openSaveGroupDialog = () => {
+    if (selectedDevices.length === 0) {
+      setErrorType("group");
+      setErrorMessage("Please select at least one device to create a group.");
+      setErrorDialog(true);
+      return;
+    }
+    setSaveGroupDialog(true);
+  };
+
+  const saveGroup = () => {
+    if (!groupName.trim()) {
+      return;
+    }
+    const success = addGroup({
+      name: groupName.trim(),
+      members: selectedDevices,
+    });
+    if (!success) {
+      setErrorType("group");
+      setErrorMessage(`A group named "${groupName.trim()}" already exists. Please choose a different name.`);
+      setSaveGroupDialog(false);
+      setErrorDialog(true);
+      setGroupName("");
+      return;
+    }
+    setGroupName("");
+    setSaveGroupDialog(false);
+    // Reload groups after successful save
+    const loadedGroups = getGroups();
+    setGroups(loadedGroups);
   };
   
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -87,6 +143,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     });
   };
 
+  const selectGroup = (group: Group) => {
+    // Select all members from the group
+    setSelectedDevices(group.members);
+  };
+
   // Clear file selection when activeTransaction is cleared
   React.useEffect(() => {
     if (!activeTransaction) {
@@ -99,6 +160,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       txInitializedRef.current = null;
     }
   }, [activeTransaction]);
+
+  // Load groups from localStorage
+  React.useEffect(() => {
+    const loadedGroups = getGroups();
+    setGroups(loadedGroups);
+  }, []);
 
   React.useEffect(() => {
     let interval: number;
@@ -202,6 +269,57 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
         {/* Content */}
         <div className="flex-1 p-4 md:p-8 bg-slate-50/50">
+          {/* Groups Section */}
+          {groups.length > 0 && (
+            <div className="mb-8">
+              <div className="flex items-center gap-3 mb-4">
+                <span className="text-xs font-bold tracking-widest text-slate-400 uppercase">
+                  Saved Groups
+                </span>
+                <Badge
+                  variant="secondary"
+                  className="bg-foreground/10 text-primary/100 border-0 text-[10px] px-2 py-0.5"
+                >
+                  {groups.length} GROUP{pluralize(groups.length, 'S')}
+                </Badge>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+                {groups.map((group) => {
+                  // Check if all group members are selected
+                  const isSelected = group.members.length > 0 && 
+                    group.members.every(member => selectedDevices.includes(member));
+                  return (
+                    <Card 
+                      key={group.name} 
+                      onClick={() => selectGroup(group)}
+                      className={`
+                        p-4 cursor-pointer transition
+                        ${isSelected
+                          ? "ring-2 ring-primary/50 bg-primary/5 text-primary/75"
+                          : "hover:bg-slate-50 text-foreground/75"}
+                      `}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="rounded-full h-10 w-10 bg-primary/100 flex items-center justify-center">
+                          <UsersIcon className="h-5 w-5 text-background/100" />
+                        </div>
+
+                        <div className="flex-1">
+                          <p className="font-semibold text-md">
+                            {group.name}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {group.members.length} member{pluralize(group.members.length)}
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-4 md:gap-0">
             <div className="flex items-center gap-3">
               <span className="text-xs font-bold tracking-widest text-slate-400 uppercase">
@@ -219,6 +337,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               <Button
                 variant="ghost"
                 className="gap-2 text-slate-500 hover:text-slate-700"
+                onClick={openSaveGroupDialog}
               >
                 <UserPlusIcon className="h-4 w-4" />
                 Save as Group
@@ -311,21 +430,76 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         <AlertDialog open={errorDialog} onOpenChange={setErrorDialog}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle className="font-bold text-primary/100 pb-3">Failed to start transaction</AlertDialogTitle>
+              <AlertDialogTitle className="font-bold text-primary/100 pb-3">
+                {errorType === "group" ? "Group Error" : "Failed to start transaction"}
+              </AlertDialogTitle>
               <AlertDialogDescription>
-                {targetFile.length <= 0 && "Please select at least one file.\n"}
-                {selectedDevices.length <= 0 && "Please select at least one device.\n"}
-                {(activeTransaction && activeTransaction.id.length > 0) && "Already in active transaction."}
+                {errorMessage || (
+                  <>
+                    {targetFile.length <= 0 && "Please select at least one file.\n"}
+                    {selectedDevices.length <= 0 && "Please select at least one device.\n"}
+                    {(activeTransaction && activeTransaction.id.length > 0) && "Already in active transaction."}
+                  </>
+                )}
               </AlertDialogDescription>
             </AlertDialogHeader>
 
             <AlertDialogFooter>
-              <AlertDialogAction onClick={() => { setErrorDialog(false) }}
+              <AlertDialogAction onClick={() => { 
+                setErrorDialog(false);
+                setErrorMessage("");
+                setErrorType("transaction");
+              }}
                 className="p-5"
               >OK</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Save as Group Dialog */}
+        <Dialog open={saveGroupDialog} onOpenChange={setSaveGroupDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="font-bold text-primary/100">Save as Group</DialogTitle>
+              <DialogDescription>
+                Create a group with the selected devices ({selectedDevices.length} device{selectedDevices.length !== 1 ? 's' : ''})
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="group-name">Group Name</Label>
+                <Input
+                  id="group-name"
+                  placeholder="Enter group name..."
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && groupName.trim()) {
+                      saveGroup();
+                    }
+                  }}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button 
+                variant="ghost" 
+                onClick={() => {
+                  setSaveGroupDialog(false);
+                  setGroupName("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={saveGroup}
+                disabled={!groupName.trim()}
+              >
+                Save Group
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

@@ -27,6 +27,7 @@ export const STORAGE_KEYS = {
   TOKEN:           'gdrop_token',
   SELECTED_FILE:   'gdrop_sel_file',
   TRANSACTION_REQ: 'gopherdrop-transaction-request',
+  GROUPS:          'gdrop_groups',
 } as const;
 
 // Optional helper type if you want strict key usage elsewhere

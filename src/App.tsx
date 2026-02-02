@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Dashboard } from "@/components/dashboard";
 import { Setting } from "@/components/setting";
+import { Groups } from "@/components/groups";
 import { Modal } from "@/components/modal";
 import { Notification } from "@/components/notification";
 import { initAuth } from "@/lib/auth";
@@ -78,7 +79,9 @@ export function App() {
     <TransactionProvider>
       {activePage === "settings"
         ? <Setting onNavigate={navigate} />
-        : <Dashboard onNavigate={navigate} />
+        : activePage === "groups"
+          ? <Groups onNavigate={navigate} />
+          : <Dashboard onNavigate={navigate} />
       }
       <Notification/>
       <Modal/>
