@@ -1,4 +1,5 @@
 import { STORAGE_KEYS } from './config';
+import { Group } from './def';
 
 // ==========================================
 // Encoding and Decoding Functions
@@ -103,4 +104,55 @@ export async function initDeviceIdentity(): Promise<void> {
 export function setTheme(theme: 'light' | 'dark' | string): void {
   localStorage.setItem(STORAGE_KEYS.THEME, theme);
   document.documentElement.setAttribute('data-theme', theme);
+}
+
+// ==========================================
+// Group Management Functions
+// ==========================================
+
+export function getGroups(): Group[] {
+  const groupsData = localStorage.getItem(STORAGE_KEYS.GROUPS);
+  if (!groupsData) return [];
+  try {
+    return JSON.parse(groupsData);
+  } catch (e) {
+    console.error('Error parsing groups:', e);
+    return [];
+  }
+}
+
+export function saveGroups(groups: Group[]): void {
+  localStorage.setItem(STORAGE_KEYS.GROUPS, JSON.stringify(groups));
+}
+
+export function addGroup(group: Group): boolean {
+  const groups = getGroups();
+  // Check for duplicate group names
+  if (groups.some(g => g.name === group.name)) {
+    return false; // Group with this name already exists
+  }
+  groups.push(group);
+  saveGroups(groups);
+  return true; // Successfully added
+}
+
+export function deleteGroup(groupName: string): void {
+  const groups = getGroups();
+  const filtered = groups.filter(g => g.name !== groupName);
+  saveGroups(filtered);
+}
+
+export function updateGroup(oldName: string, newGroup: Group): boolean {
+  const groups = getGroups();
+  const index = groups.findIndex(g => g.name === oldName);
+  if (index === -1) {
+    return false; // Group to update not found
+  }
+  // Check if new name conflicts with another group (excluding the one being updated)
+  if (newGroup.name !== oldName && groups.some(g => g.name === newGroup.name)) {
+    return false; // Duplicate name
+  }
+  groups[index] = newGroup;
+  saveGroups(groups);
+  return true; // Successfully updated
 }
