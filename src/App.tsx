@@ -8,6 +8,7 @@ import { initAuth } from "@/lib/auth";
 import { gopherSocket } from "@/lib/ws";
 import { Loader2 } from "lucide-react";
 import { TransactionProvider } from "@/context/TransactionContext";
+import { ThemeProvider } from "@/context/ThemeContext";
 
 export function App() {
   const [activePage, setActivePage] = React.useState(() => {
@@ -76,16 +77,18 @@ export function App() {
   }
 
   return (
-    <TransactionProvider>
-      {activePage === "settings"
-        ? <Setting onNavigate={navigate} />
-        : activePage === "groups"
-          ? <Groups onNavigate={navigate} />
-          : <Dashboard onNavigate={navigate} />
-      }
-      <Notification/>
-      <Modal/>
-    </TransactionProvider>
+    <ThemeProvider>
+      <TransactionProvider>
+        {activePage === "settings"
+          ? <Setting onNavigate={navigate} />
+          : activePage === "groups"
+            ? <Groups onNavigate={navigate} />
+            : <Dashboard onNavigate={navigate} />
+        }
+        <Notification/>
+        <Modal/>
+      </TransactionProvider>
+    </ThemeProvider>
   );
 }
 

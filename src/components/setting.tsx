@@ -1,6 +1,7 @@
 import * as React from "react";
-import { DownloadIcon } from "lucide-react";
+import { DownloadIcon, Sun, Moon, Monitor } from "lucide-react";
 import { gopherSocket, WSTypes } from "@/lib/ws";
+import { useTheme } from "@/context/ThemeContext";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +26,7 @@ export function Setting({ onNavigate }: SettingProps) {
   const [deviceName, setDeviceName] = React.useState("Tidak ada nama");
   const [isDiscoverable, setIsDiscoverable] = React.useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+  const { theme, setTheme } = useTheme();
 
   // TODO: watch response
   const sendDiscoverableEdit = async (checked: boolean) => {
@@ -142,6 +144,46 @@ export function Setting({ onNavigate }: SettingProps) {
         </header>
 
         <div className="flex-1 p-4 md:p-8 max-w-2xl mx-auto w-full">
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="text-primary/100 font-bold">Appearance</CardTitle>
+              <CardDescription>
+                Customize how GopherDrop looks on your device.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Theme</Label>
+                <div className="grid grid-cols-3 gap-3">
+                  <Button
+                    variant={theme === "light" ? "default" : "outline"}
+                    className="flex flex-col items-center gap-2 h-auto py-4"
+                    onClick={() => setTheme("light")}
+                  >
+                    <Sun className="h-5 w-5" />
+                    <span className="text-sm">Light</span>
+                  </Button>
+                  <Button
+                    variant={theme === "dark" ? "default" : "outline"}
+                    className="flex flex-col items-center gap-2 h-auto py-4"
+                    onClick={() => setTheme("dark")}
+                  >
+                    <Moon className="h-5 w-5" />
+                    <span className="text-sm">Dark</span>
+                  </Button>
+                  <Button
+                    variant={theme === "auto" ? "default" : "outline"}
+                    className="flex flex-col items-center gap-2 h-auto py-4"
+                    onClick={() => setTheme("auto")}
+                  >
+                    <Monitor className="h-5 w-5" />
+                    <span className="text-sm">Auto</span>
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card className="mb-6">
             <CardHeader>
               <CardTitle className="text-primary/100 font-bold">Device Settings</CardTitle>
