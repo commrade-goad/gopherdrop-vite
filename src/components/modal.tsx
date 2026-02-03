@@ -330,17 +330,22 @@ export function Modal() {
       const totalBytes = progressArray.reduce((sum, p) => sum + p.totalBytes, 0);
       const transferredBytes = progressArray.reduce((sum, p) => sum + p.bytesTransferred, 0);
       
+      // Check completion first
+      if (transferredBytes >= totalBytes) {
+        setTimeRemaining("Complete");
+        setTransferSpeed(0);
+        return;
+      }
+      
       const now = Date.now();
       const timeDiff = (now - lastTimeRef.current) / 1000; // seconds
       
-      if (timeDiff > 0) {
+      // Skip first calculation to avoid inaccurate speed
+      if (timeDiff > 0 && lastBytesRef.current > 0) {
         const bytesDiff = transferredBytes - lastBytesRef.current;
         const speed = bytesDiff / timeDiff; // bytes per second
         setTransferSpeed(speed);
         
-        lastBytesRef.current = transferredBytes;
-        lastTimeRef.current = now;
-
         // Calculate time remaining
         const remainingBytes = totalBytes - transferredBytes;
         if (speed > 0 && remainingBytes > 0) {
@@ -352,10 +357,11 @@ export function Modal() {
           } else {
             setTimeRemaining(`${Math.ceil(secondsRemaining / 3600)}h`);
           }
-        } else if (transferredBytes >= totalBytes) {
-          setTimeRemaining("Complete");
         }
       }
+      
+      lastBytesRef.current = transferredBytes;
+      lastTimeRef.current = now;
     }, 500); // Update every 500ms
 
     return () => clearInterval(interval);

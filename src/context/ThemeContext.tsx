@@ -20,9 +20,14 @@ function getSystemTheme(): "light" | "dark" {
 }
 
 function getStoredTheme(): Theme {
-  const stored = localStorage.getItem(THEME_KEY);
-  if (stored === "light" || stored === "dark" || stored === "auto") {
-    return stored;
+  try {
+    const stored = localStorage.getItem(THEME_KEY);
+    if (stored === "light" || stored === "dark" || stored === "auto") {
+      return stored;
+    }
+  } catch (error) {
+    // Handle localStorage errors (private browsing, quota exceeded, etc.)
+    console.warn("Failed to read theme from localStorage:", error);
   }
   return "light";
 }
@@ -61,7 +66,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const setTheme = React.useCallback((newTheme: Theme) => {
     setThemeState(newTheme);
-    localStorage.setItem(THEME_KEY, newTheme);
+    try {
+      localStorage.setItem(THEME_KEY, newTheme);
+    } catch (error) {
+      // Handle localStorage errors (private browsing, quota exceeded, etc.)
+      console.warn("Failed to save theme to localStorage:", error);
+    }
   }, []);
 
   return (
