@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { LucideIcon } from "lucide-react";
 
 interface SidebarProps {
   activePage: string;
@@ -15,21 +16,24 @@ interface SidebarProps {
   setIsMobileMenuOpen: (isOpen: boolean) => void;
 }
 
-export function Sidebar({
+interface NavItemProps {
+  page: string;
+  icon: LucideIcon;
+  label: string;
+  activePage: string;
+  onNavigate: (page: string) => void;
+  setIsMobileMenuOpen: (isOpen: boolean) => void;
+}
+
+function NavItem({
+  page,
+  icon: Icon,
+  label,
   activePage,
   onNavigate,
-  isMobileMenuOpen,
   setIsMobileMenuOpen,
-}: SidebarProps) {
-  const NavItem = ({
-    page,
-    icon: Icon,
-    label,
-  }: {
-    page: string;
-    icon: any;
-    label: string;
-  }) => (
+}: NavItemProps) {
+  return (
     <Button
       variant="ghost"
       className={cn(
@@ -47,6 +51,14 @@ export function Sidebar({
       {label}
     </Button>
   );
+}
+
+export function Sidebar({
+  activePage,
+  onNavigate,
+  isMobileMenuOpen,
+  setIsMobileMenuOpen,
+}: SidebarProps) {
 
   return (
     <>
@@ -60,9 +72,30 @@ export function Sidebar({
         </div>
 
         <nav className="flex-1 px-4 space-y-2 mt-4">
-          <NavItem page="dashboard" icon={LayoutGridIcon} label="Dashboard" />
-          <NavItem page="groups" icon={UsersIcon} label="Groups" />
-          <NavItem page="settings" icon={SettingsIcon} label="Settings" />
+          <NavItem
+            page="dashboard"
+            icon={LayoutGridIcon}
+            label="Dashboard"
+            activePage={activePage}
+            onNavigate={onNavigate}
+            setIsMobileMenuOpen={setIsMobileMenuOpen}
+          />
+          <NavItem
+            page="groups"
+            icon={UsersIcon}
+            label="Groups"
+            activePage={activePage}
+            onNavigate={onNavigate}
+            setIsMobileMenuOpen={setIsMobileMenuOpen}
+          />
+          <NavItem
+            page="settings"
+            icon={SettingsIcon}
+            label="Settings"
+            activePage={activePage}
+            onNavigate={onNavigate}
+            setIsMobileMenuOpen={setIsMobileMenuOpen}
+          />
         </nav>
       </aside>
 
@@ -87,9 +120,30 @@ export function Sidebar({
             </Button>
           </div>
           <nav className="flex-1 px-4 space-y-2 mt-4">
-            <NavItem page="dashboard" icon={LayoutGridIcon} label="Dashboard" />
-            <NavItem page="groups" icon={UsersIcon} label="Groups" />
-            <NavItem page="settings" icon={SettingsIcon} label="Settings" />
+            <NavItem
+              page="dashboard"
+              icon={LayoutGridIcon}
+              label="Dashboard"
+              activePage={activePage}
+              onNavigate={onNavigate}
+              setIsMobileMenuOpen={setIsMobileMenuOpen}
+            />
+            <NavItem
+              page="groups"
+              icon={UsersIcon}
+              label="Groups"
+              activePage={activePage}
+              onNavigate={onNavigate}
+              setIsMobileMenuOpen={setIsMobileMenuOpen}
+            />
+            <NavItem
+              page="settings"
+              icon={SettingsIcon}
+              label="Settings"
+              activePage={activePage}
+              onNavigate={onNavigate}
+              setIsMobileMenuOpen={setIsMobileMenuOpen}
+            />
           </nav>
         </div>
       )}

@@ -45,6 +45,13 @@ export function Modal() {
   const hasInitializedWebRTC = React.useRef(false);
   const pollIntervalRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Track transfer stats
+  const [transferSpeed, setTransferSpeed] = React.useState<number>(0);
+  const [timeRemaining, setTimeRemaining] = React.useState<string>("Calculating...");
+  const startTimeRef = React.useRef<number>(0);
+  const lastBytesRef = React.useRef<number>(0);
+  const lastTimeRef = React.useRef<number>(0);
+
   // Track target statuses for continue button validation
   const [canContinue, setCanContinue] = React.useState(true);
 
@@ -79,6 +86,44 @@ export function Modal() {
     console.log('Continue button clicked');
     startFileTransfer();
   }, [startFileTransfer]);
+
+  // Cleanup only version (when receiving DELETE from other party)
+  const handleCancelCleanupOnly = React.useCallback(() => {
+    console.log('Cleanup only (transaction deleted by other party)');
+
+    // Stop polling
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+
+    // Clean up WebRTC if it exists
+    if (webrtcManagerRef.current) {
+      webrtcManagerRef.current.destroy();
+      webrtcManagerRef.current = null;
+    }
+
+    // Reset all local state
+    setIsTransferring(false);
+    setAllFilesComplete(false);
+    setConnectionFailed(false);
+    setCanContinue(true);
+    hasInitializedWebRTC.current = false;
+    setTransferProgress(new Map());
+    setTransferSpeed(0);
+    setTimeRemaining("Calculating...");
+    startTimeRef.current = 0;
+    lastBytesRef.current = 0;
+    lastTimeRef.current = 0;
+
+    // Reset context state but DON'T send DELETE (already deleted)
+    if (resetAllState) {
+      resetAllState();
+    }
+
+    // Close modal
+    SetOpenModal(false);
+  }, [resetAllState]);
 
   // Poll transaction info when waiting
   React.useEffect(() => {
@@ -134,7 +179,7 @@ export function Modal() {
         pollIntervalRef.current = null;
       }
     }
-  }, [activeTransaction, myPublicKey, isTransferring]);
+  }, [activeTransaction, myPublicKey, isTransferring, handleCancelCleanupOnly]);
 
   // Listen for START_TRANSACTION message to initialize WebRTC
   React.useEffect(() => {
@@ -166,6 +211,9 @@ export function Modal() {
         hasInitializedWebRTC.current = true;
         setIsTransferring(true);
         setConnectionFailed(false);
+        startTimeRef.current = Date.now();
+        lastTimeRef.current = Date.now();
+        lastBytesRef.current = 0;
 
         const manager = new WebRTCManager(
           activeTransaction.id,
@@ -216,6 +264,9 @@ export function Modal() {
           hasInitializedWebRTC.current = true;
           setIsTransferring(true);
           setConnectionFailed(false);
+          startTimeRef.current = Date.now();
+          lastTimeRef.current = Date.now();
+          lastBytesRef.current = 0;
 
           const manager = new WebRTCManager(
             activeTransaction.id,
@@ -268,6 +319,54 @@ export function Modal() {
     };
   }, [activeTransaction, selectedFiles, selectedTargets, myPublicKey]);
 
+  // Calculate transfer speed and time remaining
+  React.useEffect(() => {
+    if (!isTransferring) return;
+
+    const interval = setInterval(() => {
+      const progressArray = Array.from(transferProgress.values());
+      if (progressArray.length === 0) return;
+
+      const totalBytes = progressArray.reduce((sum, p) => sum + p.totalBytes, 0);
+      const transferredBytes = progressArray.reduce((sum, p) => sum + p.bytesTransferred, 0);
+      
+      // Check completion first
+      if (transferredBytes >= totalBytes) {
+        setTimeRemaining("Complete");
+        setTransferSpeed(0);
+        return;
+      }
+      
+      const now = Date.now();
+      const timeDiff = (now - lastTimeRef.current) / 1000; // seconds
+      
+      // Skip first calculation to avoid inaccurate speed
+      if (timeDiff > 0 && lastBytesRef.current > 0) {
+        const bytesDiff = transferredBytes - lastBytesRef.current;
+        const speed = bytesDiff / timeDiff; // bytes per second
+        setTransferSpeed(speed);
+        
+        // Calculate time remaining
+        const remainingBytes = totalBytes - transferredBytes;
+        if (speed > 0 && remainingBytes > 0) {
+          const secondsRemaining = remainingBytes / speed;
+          if (secondsRemaining < 60) {
+            setTimeRemaining(`${Math.ceil(secondsRemaining)}s`);
+          } else if (secondsRemaining < 3600) {
+            setTimeRemaining(`${Math.ceil(secondsRemaining / 60)}m`);
+          } else {
+            setTimeRemaining(`${Math.ceil(secondsRemaining / 3600)}h`);
+          }
+        }
+      }
+      
+      lastBytesRef.current = transferredBytes;
+      lastTimeRef.current = now;
+    }, 500); // Update every 500ms
+
+    return () => clearInterval(interval);
+  }, [isTransferring, transferProgress]);
+
 
   const decideTitle = () => {
     if (connectionFailed) {
@@ -291,7 +390,8 @@ export function Modal() {
       const progressArray = Array.from(transferProgress.values());
       if (progressArray.length > 0) {
         const avgProgress = progressArray.reduce((sum, p) => sum + p.percentage, 0) / progressArray.length;
-        return `Progress: ${avgProgress.toFixed(1)}%`;
+        const speedMBps = (transferSpeed / (1024 * 1024)).toFixed(2);
+        return `Progress: ${avgProgress.toFixed(1)}% • ${speedMBps} MB/s • ${timeRemaining} remaining`;
       }
       return "Establishing connection...";
     }
@@ -337,7 +437,7 @@ export function Modal() {
     }
   };
 
-  const handleFinishAndReset = () => {
+  const handleFinishAndReset = React.useCallback(() => {
     console.log('Finish and reset clicked');
 
     // Stop polling
@@ -359,6 +459,11 @@ export function Modal() {
     setCanContinue(true);
     hasInitializedWebRTC.current = false;
     setTransferProgress(new Map());
+    setTransferSpeed(0);
+    setTimeRemaining("Calculating...");
+    startTimeRef.current = 0;
+    lastBytesRef.current = 0;
+    lastTimeRef.current = 0;
 
     // Reset context state (this sends DELETE_TRANSACTION)
     if (resetAllState) {
@@ -367,9 +472,9 @@ export function Modal() {
 
     // Close modal
     SetOpenModal(false);
-  };
+  }, [resetAllState]);
 
-  const handleCancel = () => {
+  const handleCancel = React.useCallback(() => {
     console.log('Cancel button clicked');
 
     // Stop polling
@@ -397,6 +502,11 @@ export function Modal() {
     setCanContinue(true);
     hasInitializedWebRTC.current = false;
     setTransferProgress(new Map());
+    setTransferSpeed(0);
+    setTimeRemaining("Calculating...");
+    startTimeRef.current = 0;
+    lastBytesRef.current = 0;
+    lastTimeRef.current = 0;
 
     // Reset context state (this also sends DELETE_TRANSACTION, but that's okay - duplicate won't hurt)
     if (resetAllState) {
@@ -405,40 +515,7 @@ export function Modal() {
 
     // Close modal
     SetOpenModal(false);
-  };
-
-  // Cleanup only version (when receiving DELETE from other party)
-  const handleCancelCleanupOnly = () => {
-    console.log('Cleanup only (transaction deleted by other party)');
-
-    // Stop polling
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
-    }
-
-    // Clean up WebRTC if it exists
-    if (webrtcManagerRef.current) {
-      webrtcManagerRef.current.destroy();
-      webrtcManagerRef.current = null;
-    }
-
-    // Reset all local state
-    setIsTransferring(false);
-    setAllFilesComplete(false);
-    setConnectionFailed(false);
-    setCanContinue(true);
-    hasInitializedWebRTC.current = false;
-    setTransferProgress(new Map());
-
-    // Reset context state but DON'T send DELETE (already deleted)
-    if (resetAllState) {
-      resetAllState();
-    }
-
-    // Close modal
-    SetOpenModal(false);
-  };
+  }, [activeTransaction, resetAllState]);
 
   React.useEffect(() => {
     if (!activeTransaction) {
