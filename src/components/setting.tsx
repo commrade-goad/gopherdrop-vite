@@ -41,7 +41,7 @@ export function Setting({ onNavigate }: SettingProps) {
   };
 
   React.useEffect(() => {
-    const handler = (userInfo: any) => {
+    const handler = (userInfo: { is_discoverable: boolean; username: string }) => {
       setIsDiscoverable(userInfo.is_discoverable);
       setDeviceName(userInfo.username);
     };

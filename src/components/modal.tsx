@@ -87,6 +87,44 @@ export function Modal() {
     startFileTransfer();
   }, [startFileTransfer]);
 
+  // Cleanup only version (when receiving DELETE from other party)
+  const handleCancelCleanupOnly = React.useCallback(() => {
+    console.log('Cleanup only (transaction deleted by other party)');
+
+    // Stop polling
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+
+    // Clean up WebRTC if it exists
+    if (webrtcManagerRef.current) {
+      webrtcManagerRef.current.destroy();
+      webrtcManagerRef.current = null;
+    }
+
+    // Reset all local state
+    setIsTransferring(false);
+    setAllFilesComplete(false);
+    setConnectionFailed(false);
+    setCanContinue(true);
+    hasInitializedWebRTC.current = false;
+    setTransferProgress(new Map());
+    setTransferSpeed(0);
+    setTimeRemaining("Calculating...");
+    startTimeRef.current = 0;
+    lastBytesRef.current = 0;
+    lastTimeRef.current = 0;
+
+    // Reset context state but DON'T send DELETE (already deleted)
+    if (resetAllState) {
+      resetAllState();
+    }
+
+    // Close modal
+    SetOpenModal(false);
+  }, [resetAllState]);
+
   // Poll transaction info when waiting
   React.useEffect(() => {
     if (!activeTransaction) return;
@@ -141,7 +179,7 @@ export function Modal() {
         pollIntervalRef.current = null;
       }
     }
-  }, [activeTransaction, myPublicKey, isTransferring]);
+  }, [activeTransaction, myPublicKey, isTransferring, handleCancelCleanupOnly]);
 
   // Listen for START_TRANSACTION message to initialize WebRTC
   React.useEffect(() => {
@@ -393,7 +431,7 @@ export function Modal() {
     }
   };
 
-  const handleFinishAndReset = () => {
+  const handleFinishAndReset = React.useCallback(() => {
     console.log('Finish and reset clicked');
 
     // Stop polling
@@ -415,6 +453,11 @@ export function Modal() {
     setCanContinue(true);
     hasInitializedWebRTC.current = false;
     setTransferProgress(new Map());
+    setTransferSpeed(0);
+    setTimeRemaining("Calculating...");
+    startTimeRef.current = 0;
+    lastBytesRef.current = 0;
+    lastTimeRef.current = 0;
 
     // Reset context state (this sends DELETE_TRANSACTION)
     if (resetAllState) {
@@ -423,9 +466,9 @@ export function Modal() {
 
     // Close modal
     SetOpenModal(false);
-  };
+  }, [resetAllState]);
 
-  const handleCancel = () => {
+  const handleCancel = React.useCallback(() => {
     console.log('Cancel button clicked');
 
     // Stop polling
@@ -466,45 +509,7 @@ export function Modal() {
 
     // Close modal
     SetOpenModal(false);
-  };
-
-  // Cleanup only version (when receiving DELETE from other party)
-  const handleCancelCleanupOnly = () => {
-    console.log('Cleanup only (transaction deleted by other party)');
-
-    // Stop polling
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
-    }
-
-    // Clean up WebRTC if it exists
-    if (webrtcManagerRef.current) {
-      webrtcManagerRef.current.destroy();
-      webrtcManagerRef.current = null;
-    }
-
-    // Reset all local state
-    setIsTransferring(false);
-    setAllFilesComplete(false);
-    setConnectionFailed(false);
-    setCanContinue(true);
-    hasInitializedWebRTC.current = false;
-    setTransferProgress(new Map());
-    setTransferSpeed(0);
-    setTimeRemaining("Calculating...");
-    startTimeRef.current = 0;
-    lastBytesRef.current = 0;
-    lastTimeRef.current = 0;
-
-    // Reset context state but DON'T send DELETE (already deleted)
-    if (resetAllState) {
-      resetAllState();
-    }
-
-    // Close modal
-    SetOpenModal(false);
-  };
+  }, [activeTransaction, resetAllState]);
 
   React.useEffect(() => {
     if (!activeTransaction) {

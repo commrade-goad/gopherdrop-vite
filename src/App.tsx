@@ -35,6 +35,7 @@ export function App() {
         }
       } catch (err) {
         if (!cancelled) {
+          console.error("Authentication error:", err);
           setAuthError("Authentication failed");
         }
       } finally {
