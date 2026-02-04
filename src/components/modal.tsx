@@ -232,11 +232,11 @@ export function Modal() {
               setTransferProgress((prev) => {
                 const next = new Map(prev);
                 // Remove all progress entries for this peer
-                Array.from(next.keys()).forEach(key => {
+                for (const key of next.keys()) {
                   if (key.startsWith(`${targetKey}-`)) {
                     next.delete(key);
                   }
-                });
+                }
                 return next;
               });
             },

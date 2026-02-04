@@ -100,12 +100,8 @@ export function Setting({ onNavigate }: SettingProps) {
           }
 
           // Update localStorage with loaded keys and settings
-          if (data.privateKey) {
-            localStorage.setItem(STORAGE_KEYS.PRIVATE_KEY, data.privateKey);
-          }
-          if (data.publicKey) {
-            localStorage.setItem(STORAGE_KEYS.PUBLIC_KEY, data.publicKey);
-          }
+          localStorage.setItem(STORAGE_KEYS.PRIVATE_KEY, data.privateKey);
+          localStorage.setItem(STORAGE_KEYS.PUBLIC_KEY, data.publicKey);
           if (data.groups) {
             localStorage.setItem(STORAGE_KEYS.GROUPS, JSON.stringify(data.groups));
           }
