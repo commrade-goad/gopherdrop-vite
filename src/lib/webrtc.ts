@@ -18,6 +18,7 @@ export interface WebRTCManagerCallbacks {
   onError?: (targetKey: string, error: Error) => void;
   onAllFilesComplete?: () => void;
   onConnectionFailed?: () => void;
+  onPeerDisconnected?: (targetKey: string) => void;
 }
 
 interface PeerConnection {
@@ -220,6 +221,9 @@ export class WebRTCManager {
       }
       peer.connection.close();
       this.peers.delete(targetKey);
+
+      // Notify that this peer has been permanently disconnected
+      this.callbacks.onPeerDisconnected?.(targetKey);
 
       // Notify about the error
       this.callbacks.onError?.(
