@@ -194,6 +194,19 @@ export function Modal() {
               setConnectionFailed(true);
               setIsTransferring(false);
             },
+            onPeerDisconnected: (targetKey) => {
+              console.log(`Peer ${targetKey} permanently disconnected, removing from progress`);
+              setTransferProgress((prev) => {
+                const next = new Map(prev);
+                // Remove all progress entries for this peer
+                Array.from(next.keys()).forEach(key => {
+                  if (key.startsWith(`${targetKey}-`)) {
+                    next.delete(key);
+                  }
+                });
+                return next;
+              });
+            },
           }
         );
 

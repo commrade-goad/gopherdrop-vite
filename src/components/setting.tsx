@@ -14,6 +14,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Sidebar } from "@/components/sidebar";
+import { getPrivateKey, getPublicKey, getGroups } from "@/lib/helper";
+import { STORAGE_KEYS } from "@/lib/config";
 
 // TODO: export and import actually save the stuff to the server
 
@@ -57,9 +59,16 @@ export function Setting({ onNavigate }: SettingProps) {
   }, []);
 
   const handleSaveJson = () => {
+    const privateKey = getPrivateKey();
+    const publicKey = getPublicKey();
+    const groups = getGroups();
+
     const data = {
       deviceName,
       isDiscoverable,
+      privateKey,
+      publicKey,
+      groups,
       timestamp: new Date().toISOString(),
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], {
@@ -68,7 +77,7 @@ export function Setting({ onNavigate }: SettingProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "gopherdrop-user-data.json";
+    a.download = "gopherdrop-settings.json";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -83,9 +92,26 @@ export function Setting({ onNavigate }: SettingProps) {
         try {
           const content = e.target?.result as string;
           const data = JSON.parse(content);
-          if (data.deviceName) setDeviceName(data.deviceName);
-          if (data.isDiscoverable !== undefined)
-            setIsDiscoverable(data.isDiscoverable);
+          
+          // Validate required fields
+          if (!data.privateKey || !data.publicKey) {
+            alert("Invalid settings file: Missing private or public key");
+            return;
+          }
+
+          // Update localStorage with loaded keys and settings
+          if (data.privateKey) {
+            localStorage.setItem(STORAGE_KEYS.PRIVATE_KEY, data.privateKey);
+          }
+          if (data.publicKey) {
+            localStorage.setItem(STORAGE_KEYS.PUBLIC_KEY, data.publicKey);
+          }
+          if (data.groups) {
+            localStorage.setItem(STORAGE_KEYS.GROUPS, JSON.stringify(data.groups));
+          }
+
+          // Reload the page to use the loaded user
+          window.location.reload();
         } catch (error) {
           console.error("Error parsing JSON:", error);
           alert("Invalid JSON file");
@@ -93,6 +119,8 @@ export function Setting({ onNavigate }: SettingProps) {
       };
       reader.readAsText(file);
     }
+    // Clear the file input so the same file can be loaded again if needed
+    event.target.value = '';
   };
 
   return (
@@ -181,21 +209,21 @@ export function Setting({ onNavigate }: SettingProps) {
 
           <Card>
             <CardHeader>
-              <CardTitle>Data Management <span className="text-bold text-red-500">[TODO]</span></CardTitle>
+              <CardTitle>Data Management</CardTitle>
               <CardDescription>
-                                 Export or import your user data.
+                               Export or import your settings, groups, and keys.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4">
-              <Label htmlFor="file-upload">Save User Data</Label>
+              <Label htmlFor="file-upload">Save Settings</Label>
               <Button className="w-full sm:w-auto" onClick={handleSaveJson}>
                 <DownloadIcon className="mr-2 h-4 w-4" />
-                                                           Save User Data (JSON)
+                                                           Save Settings (JSON)
               </Button>
               <div className="flex items-center gap-4">
                 <div className="flex flex-col w-full gap-1.5">
                   <Label htmlFor="file-upload" className="mb-2">
-                     Load User Data
+                     Load Settings
                   </Label>
                   <Input
                     id="file-upload"
@@ -203,6 +231,9 @@ export function Setting({ onNavigate }: SettingProps) {
                     accept=".json"
                     onChange={handleLoadJson}
                   />
+                  <p className="text-xs text-slate-500 mt-1">
+                    Note: Loading settings will reload the page with the loaded user credentials.
+                  </p>
                 </div>
               </div>
             </CardContent>
